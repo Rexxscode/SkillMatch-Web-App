@@ -24,9 +24,11 @@ class AssessmentController extends Controller
         ]);
     }
 
-    public function adminQuestions(Request $request): JsonResponse
+    public function adminQuestions(Request $request, $major = null): JsonResponse
     {
-        $data = $this->assessment->adminQuestions($request->query('major'));
+        $major = $major ?? $request->query('major');
+
+        $data = $this->assessment->adminQuestions($major);
 
         return response()->json([
             'success' => true,

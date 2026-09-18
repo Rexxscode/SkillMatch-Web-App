@@ -188,12 +188,14 @@ export default function AdminMajorQuizPage() {
   };
 
   if (editingMajor) {
-    const majorShort = MAJORS.find((m) => m.name === editingMajor)?.short || editingMajor;
+    const majorInfo = MAJORS.find((m) => m.short === editingMajor);
+    const majorShort = majorInfo?.short || editingMajor;
+    const majorFullName = majorInfo?.name || editingMajor;
     return (
       <div>
         <DashboardHeader
           title={`Kelola Soal Tes Jurusan: ${majorShort}`}
-          subtitle={`${editingMajor} · ${draft.length} soal Tes Jurusan`}
+          subtitle={`${majorFullName} · ${draft.length} soal Tes Jurusan`}
           actions={
             <button
               onClick={closeEditor}
@@ -415,7 +417,7 @@ export default function AdminMajorQuizPage() {
               <h4 className="font-semibold text-foreground mb-1">{major.name}</h4>
               <p className="text-xs text-muted mb-4 flex-1">Bank soal tes jurusan · backend</p>
               <button
-                onClick={() => openEditor(major.name)}
+                onClick={() => openEditor(major.short)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors"
               >
                 <ListChecks className="w-4 h-4" />

@@ -81,6 +81,13 @@ class AdminIntegrationFeatureTest extends TestCase
             'data' => [['id', 'major_id', 'question', 'options', 'correct', 'difficulty', 'skill']],
             'meta',
         ]);
+
+        $data = $response->json('data');
+        $this->assertGreaterThan(0, count($data), 'Admin questions empty for RPL');
+        $this->assertTrue(
+            collect($data)->every(fn ($q) => $q['major_id'] === 'RPL'),
+            'Admin questions must only contain RPL questions when filtered by major'
+        );
     }
 
     public function test_admin_materi_questions_expose_correct()
