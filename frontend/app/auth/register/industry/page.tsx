@@ -7,6 +7,7 @@ import { Mail, Lock, User, Building2, Eye, EyeOff, ArrowLeft } from "lucide-reac
 import { useAuth } from "../../../lib/auth-context";
 import { ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast-context";
+import AuthShell from "../../../components/auth/auth-shell";
 
 export default function IndustryRegisterPage() {
   const router = useRouter();
@@ -24,10 +25,12 @@ export default function IndustryRegisterPage() {
     e.preventDefault();
     if (!name || !company || !email) {
       setError("Nama, nama perusahaan, dan email harus diisi");
+      toast("Nama, nama perusahaan, dan email harus diisi", "error");
       return;
     }
     if (password.length < 8) {
       setError("Password minimal 8 karakter");
+      toast("Password minimal 8 karakter", "error");
       return;
     }
 
@@ -64,21 +67,23 @@ export default function IndustryRegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary/5 px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <img src="/logo-skillmatch-baru.png" alt="SkillMatch" className="w-10 h-10 rounded-xl object-contain" />
-            <span className="text-2xl font-bold text-primary">
-              SkillMatch
-            </span>
-          </Link>
-          <h1 className="text-2xl font-bold text-foreground">Daftar Sebagai Perusahaan</h1>
-          <p className="text-sm text-muted mt-2">Tambahkan perusahaan kamu dan temukan talenta vokasi terbaik.</p>
-        </div>
-
-        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8 shadow-sm">
-          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+    <AuthShell>
+      <div className="text-center mb-8 lg:hidden">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4">
+          <img src="/logo-skillmatch-baru.png" alt="SkillMatch" className="w-10 h-10 rounded-xl object-contain" />
+          <span className="text-2xl font-bold text-primary">
+            SkillMatch
+          </span>
+        </Link>
+      </div>
+      <div className="mb-8">
+        <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          Daftar Perusahaan
+        </span>
+        <h1 className="text-2xl font-bold text-foreground mt-3">Daftar Sebagai Perusahaan</h1>
+        <p className="text-sm text-muted mt-1">Tambahkan perusahaan kamu dan temukan talenta vokasi terbaik.</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1.5">
                 Nama PIC (Nama Kamu)
@@ -177,8 +182,6 @@ export default function IndustryRegisterPage() {
               </Link>
             </p>
           </div>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

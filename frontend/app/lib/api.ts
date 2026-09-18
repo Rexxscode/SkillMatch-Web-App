@@ -61,10 +61,15 @@ async function request<T>(
 
   if (response.status === 401) {
     removeToken();
-    if (typeof window !== "undefined") {
+    const isAuthAttempt =
+      url === BACKEND_ENDPOINTS.auth.login || url === BACKEND_ENDPOINTS.auth.register;
+    if (!isAuthAttempt && typeof window !== "undefined") {
       window.location.href = "/auth/login";
     }
-    throw new ApiError(401, "Session expired. Please login again.");
+    throw new ApiError(
+      401,
+      isAuthAttempt ? "Email atau password salah" : "Session expired. Please login again.",
+    );
   }
 
   const data = await response.json();

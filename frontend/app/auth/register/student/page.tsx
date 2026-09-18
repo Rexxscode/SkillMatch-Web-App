@@ -7,6 +7,7 @@ import { Mail, Lock, User, BookOpen, Eye, EyeOff, IdCard, ArrowLeft } from "luci
 import { useAuth } from "../../../lib/auth-context";
 import { ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast-context";
+import AuthShell from "../../../components/auth/auth-shell";
 
 export default function StudentRegisterPage() {
   const router = useRouter();
@@ -25,14 +26,17 @@ export default function StudentRegisterPage() {
     e.preventDefault();
     if (!name || !email) {
       setError("Nama dan email harus diisi");
+      toast("Nama dan email harus diisi", "error");
       return;
     }
     if (!major || !grade) {
       setError("Jurusan dan kelas harus diisi");
+      toast("Jurusan dan kelas harus diisi", "error");
       return;
     }
     if (password.length < 8) {
       setError("Password minimal 8 karakter");
+      toast("Password minimal 8 karakter", "error");
       return;
     }
 
@@ -70,21 +74,23 @@ export default function StudentRegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary/5 px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <img src="/logo-skillmatch-baru.png" alt="SkillMatch" className="w-10 h-10 rounded-xl object-contain" />
-            <span className="text-2xl font-bold text-primary">
-              SkillMatch
-            </span>
-          </Link>
-          <h1 className="text-2xl font-bold text-foreground">Daftar Sebagai Siswa</h1>
-          <p className="text-sm text-muted mt-2">Lengkapi data diri untuk memulai kariermu bersama SkillMatch.</p>
-        </div>
-
-        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8 shadow-sm">
-          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+    <AuthShell>
+      <div className="text-center mb-8 lg:hidden">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4">
+          <img src="/logo-skillmatch-baru.png" alt="SkillMatch" className="w-10 h-10 rounded-xl object-contain" />
+          <span className="text-2xl font-bold text-primary">
+            SkillMatch
+          </span>
+        </Link>
+      </div>
+      <div className="mb-8">
+        <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          Daftar Siswa
+        </span>
+        <h1 className="text-2xl font-bold text-foreground mt-3">Daftar Sebagai Siswa</h1>
+        <p className="text-sm text-muted mt-1">Lengkapi data diri untuk memulai kariermu bersama SkillMatch.</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1.5">
                 Nama Lengkap
@@ -216,8 +222,6 @@ export default function StudentRegisterPage() {
               </Link>
             </p>
           </div>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

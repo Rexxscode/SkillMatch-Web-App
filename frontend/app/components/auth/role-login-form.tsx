@@ -34,10 +34,12 @@ export default function RoleLoginForm({
     e.preventDefault();
     if (!email || !password) {
       setError("Email dan password harus diisi");
+      toast("Email dan password harus diisi", "error");
       return;
     }
     if (password.length < 8) {
       setError("Password minimal 8 karakter");
+      toast("Password minimal 8 karakter", "error");
       return;
     }
 
