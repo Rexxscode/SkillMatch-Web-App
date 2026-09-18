@@ -1,17 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Users, User } from "lucide-react";
 import Card from "../../components/ui/card";
 import Badge from "../../components/ui/badge";
+import Pagination from "../../components/ui/pagination";
 import DashboardHeader from "../../components/layout/dashboardheader";
 import { api, BACKEND_ENDPOINTS } from "../../lib/api";
+
+const PER_PAGE = 5;
 
 type StudentRow = {
   name: string;
   email: string;
   major: string;
   grade: string;
+  avatar?: string | null;
 };
 
 type RawStudent = {
@@ -20,6 +24,7 @@ type RawStudent = {
   major?: { name?: string } | null;
   major_id?: string | null;
   grade?: string | null;
+  avatar?: string | null;
   [k: string]: unknown;
 };
 
@@ -29,6 +34,7 @@ function mapStudent(s: RawStudent): StudentRow {
     email: s.user?.email ?? "",
     major: s.major?.name ?? s.major_id ?? "-",
     grade: s.grade ?? "",
+    avatar: s.avatar ?? null,
   };
 }
 
@@ -39,6 +45,7 @@ export default function StudentsPage() {
   const majorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [rows, setRows] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -57,7 +64,10 @@ export default function StudentsPage() {
   }, []);
 
   useEffect(() => {
-    const handler = (e: Event) => setSearch((e as CustomEvent).detail || "");
+    const handler = (e: Event) => {
+      setSearch((e as CustomEvent).detail || "");
+      setPage(1);
+    };
     window.addEventListener("global-search", handler);
     return () => window.removeEventListener("global-search", handler);
   }, []);
@@ -72,6 +82,11 @@ export default function StudentsPage() {
     const matchesMajor = majorFilter === "all" || s.major === majorFilter;
     return matchesSearch && matchesMajor;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const effectivePage = Math.min(page, totalPages);
+  const pageStart = (effectivePage - 1) * PER_PAGE;
+  const paginated = filtered.slice(pageStart, pageStart + PER_PAGE);
 
   const majors = useMemo(() => [...new Set(rows.map((s) => s.major))], [rows]);
 
@@ -91,14 +106,17 @@ export default function StudentsPage() {
             type="text"
             placeholder="Cari nama, jurusan, atau email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-10 pr-4 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-input-bg text-foreground"
           />
         </div>
         <div className="relative">
           <select
             value={majorFilter}
-            onChange={(e) => { setMajorFilter(e.target.value); setMajorOpen(false); }}
+            onChange={(e) => { setMajorFilter(e.target.value); setMajorOpen(false); setPage(1); }}
             onClick={() => { clearTimeout(majorTimer.current); setMajorOpen((v) => !v); }}
             onBlur={() => { majorTimer.current = setTimeout(() => setMajorOpen(false), 200); }}
             className="w-full appearance-none px-4 py-2 pr-9 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-input-bg text-foreground"
@@ -135,6 +153,7 @@ export default function StudentsPage() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-3 px-3 font-medium text-muted">No</th>
+                    <th className="text-left py-3 px-3 font-medium text-muted">Foto Profil</th>
                     <th className="text-left py-3 px-3 font-medium text-muted">Nama</th>
                     <th className="text-left py-3 px-3 font-medium text-muted">Email</th>
                     <th className="text-left py-3 px-3 font-medium text-muted">Jurusan</th>
@@ -142,9 +161,23 @@ export default function StudentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((student, index) => (
+                  {paginated.map((student, index) => (
                     <tr key={student.email || index} className="border-b border-border/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="py-3 px-3 text-muted">{index + 1}</td>
+                      <td className="py-3 px-3 text-muted">{pageStart + index + 1}</td>
+                      <td className="py-3 px-3">
+                        {student.avatar ? (
+                          <img
+                            src={student.avatar}
+                            alt={`Foto ${student.name}`}
+                            loading="lazy"
+                            className="w-10 h-10 rounded-full object-cover border border-border"
+                          />
+                        ) : (
+                          <span className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-border flex items-center justify-center">
+                            <User className="w-5 h-5 text-muted" />
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 font-medium text-foreground">{student.name}</td>
                       <td className="py-3 px-3 text-muted break-all">{student.email}</td>
                       <td className="py-3 px-3 text-muted">{student.major}</td>
@@ -156,27 +189,52 @@ export default function StudentsPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted mt-4">Menampilkan {filtered.length} dari {rows.length} siswa</p>
+            <Pagination
+              currentPage={effectivePage}
+              lastPage={totalPages}
+              total={filtered.length}
+              perPage={PER_PAGE}
+              onPageChange={setPage}
+              itemLabel="siswa"
+            />
           </Card>
 
           {/* Cards — Mobile */}
           <div className="md:hidden space-y-3">
-            {filtered.map((student) => (
-              <Card key={student.email}>
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-medium text-foreground">{student.name}</p>
-                    <p className="text-xs text-muted break-all">{student.email}</p>
+            {paginated.map((student) => (
+              <Card key={student.email} className="flex items-center gap-3">
+                {student.avatar ? (
+                  <img
+                    src={student.avatar}
+                    alt={`Foto ${student.name}`}
+                    loading="lazy"
+                    className="w-11 h-11 rounded-full object-cover border border-border flex-shrink-0"
+                  />
+                ) : (
+                  <span className="w-11 h-11 rounded-full bg-gray-100 dark:bg-gray-800 border border-border flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-muted" />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground truncate">{student.name}</p>
+                  <p className="text-xs text-muted break-all">{student.email}</p>
+                  <div className="flex gap-2 mt-2">
+                    <Badge variant="secondary">{student.major}</Badge>
+                    <Badge variant="secondary">Kelas {student.grade}</Badge>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="secondary">{student.major}</Badge>
-                  <Badge variant="secondary">Kelas {student.grade}</Badge>
                 </div>
               </Card>
             ))}
           </div>
-          <p className="md:hidden text-xs text-muted mt-2">Menampilkan {filtered.length} dari {rows.length} siswa</p>
+          <Pagination
+            className="md:hidden"
+            currentPage={effectivePage}
+            lastPage={totalPages}
+            total={filtered.length}
+            perPage={PER_PAGE}
+            onPageChange={setPage}
+            itemLabel="siswa"
+          />
         </>
       )}
     </div>
