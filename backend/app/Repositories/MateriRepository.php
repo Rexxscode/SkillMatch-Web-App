@@ -34,6 +34,18 @@ class MateriRepository extends Repository
         return MateriQuestion::where('materi_id', $materiId)->get();
     }
 
+    public function paginateQuestionsForMateri($materiId, int $perPage)
+    {
+        return MateriQuestion::where('materi_id', $materiId)
+            ->orderBy('id')
+            ->paginate($perPage);
+    }
+
+    public function findQuestion($id): ?MateriQuestion
+    {
+        return MateriQuestion::find($id);
+    }
+
     public function deleteQuestionsForMateri($materiId): void
     {
         MateriQuestion::where('materi_id', $materiId)->delete();

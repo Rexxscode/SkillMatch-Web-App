@@ -28,16 +28,102 @@ class AssessmentService
         ];
     }
 
-    public function adminQuestions(?string $major): array
+    public function adminQuestions(?string $major, ?string $skill = null): array
     {
-        $questions = $this->assessments->adminQuestions($major);
+        $questions = $this->assessments->adminQuestions($major, $skill);
 
         return [
             'data' => $questions,
             'meta' => [
                 'total' => $questions->count(),
                 'major' => $major ?? 'all',
+                'skills' => $this->assessments->adminSkills($major),
             ],
+        ];
+    }
+
+    public function paginatedAdminQuestions(?string $major, int $perPage, ?string $skill = null): array
+    {
+        $paginated = $this->assessments->paginateAdminQuestions($major, $perPage, $skill);
+
+        return [
+            'data' => $paginated->items(),
+            'meta' => [
+                'total' => $paginated->total(),
+                'per_page' => $paginated->perPage(),
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'major' => $major ?? 'all',
+                'skills' => $this->assessments->adminSkills($major),
+            ],
+        ];
+    }
+
+    public function createQuestion(array $data): array
+    {
+        $question = $this->assessments->create([
+            'major_id' => $data['major'],
+            'question' => $data['question'],
+            'options' => json_encode($data['options']),
+            'correct' => $data['correct'],
+            'difficulty' => $data['difficulty'] ?? 'basic',
+            'skill' => $data['skill'] ?? '',
+        ]);
+
+        $this->assessments->deleteResultsForMajor($data['major']);
+
+        return $this->formatAdminQuestion($question->fresh());
+    }
+
+    public function updateQuestion(int $id, array $data): array
+    {
+        $question = $this->assessments->find($id);
+
+        if (!$question) {
+            throw ValidationException::withMessages(['question' => 'Soal tidak ditemukan']);
+        }
+
+        $payload = [];
+        foreach (['question', 'correct', 'difficulty', 'skill'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $payload[$field] = $data[$field];
+            }
+        }
+        if (array_key_exists('options', $data)) {
+            $payload['options'] = json_encode($data['options']);
+        }
+
+        $this->assessments->update($question, $payload);
+        $this->assessments->deleteResultsForMajor($question->major_id);
+
+        return $this->formatAdminQuestion($question->fresh());
+    }
+
+    public function deleteQuestion(int $id): array
+    {
+        $question = $this->assessments->find($id);
+
+        if (!$question) {
+            throw ValidationException::withMessages(['question' => 'Soal tidak ditemukan']);
+        }
+
+        $major = $question->major_id;
+        $this->assessments->delete($question);
+        $this->assessments->deleteResultsForMajor($major);
+
+        return ['id' => $id, 'major' => $major];
+    }
+
+    private function formatAdminQuestion($question): array
+    {
+        return [
+            'id' => $question->id,
+            'major_id' => $question->major_id,
+            'question' => $question->question,
+            'options' => json_decode($question->options, true) ?? [],
+            'correct' => $question->correct,
+            'difficulty' => $question->difficulty,
+            'skill' => $question->skill,
         ];
     }
 

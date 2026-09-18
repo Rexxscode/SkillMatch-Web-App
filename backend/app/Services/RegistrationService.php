@@ -29,6 +29,41 @@ class RegistrationService
         ];
     }
 
+    public function listCardVerification(?int $page, int $perPage, string $search = '', string $status = ''): array
+    {
+        if (!$page) {
+            $page = 1;
+        }
+
+        $paginated = $this->students->paginateCardHolders($perPage, $search, $status);
+
+        $items = $paginated->getCollection()->map(fn ($student) => [
+            'id' => $student->id,
+            'name' => $student->user?->name,
+            'email' => $student->user?->email,
+            'major' => $student->major_id,
+            'major_name' => $student->major?->name,
+            'grade' => $student->grade,
+            'studentCard' => $student->student_card,
+            'cardStatus' => $student->card_status ?? 'none',
+        ]);
+
+        $pendingReview = \App\Models\Student::where('card_status', '!=', 'none')
+            ->where('card_status', '!=', 'approved')
+            ->count();
+
+        return [
+            'data' => $items,
+            'meta' => [
+                'total' => $paginated->total(),
+                'per_page' => $paginated->perPage(),
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'pending_review' => $pendingReview,
+            ],
+        ];
+    }
+
     public function approveCard(string $email): array
     {
         $student = $this->requireStudentByEmail($email);

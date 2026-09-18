@@ -52,6 +52,9 @@ Route::prefix('v1/assessment')->group(function () {
     Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::put('questions', [AssessmentController::class, 'updateQuestions']);
         Route::post('questions/reset', [AssessmentController::class, 'resetQuestions']);
+        Route::post('questions', [AssessmentController::class, 'storeQuestion']);
+        Route::patch('questions/{id}', [AssessmentController::class, 'updateQuestion']);
+        Route::delete('questions/{id}', [AssessmentController::class, 'deleteQuestion']);
     });
 });
 
@@ -67,6 +70,9 @@ Route::prefix('v1/materi')->group(function () {
         Route::get('{materiId}/questions/admin', [MateriController::class, 'adminQuestions']);
         Route::put('{materiId}/questions', [MateriController::class, 'updateQuestions']);
         Route::post('{materiId}/questions/reset', [MateriController::class, 'resetQuestions']);
+        Route::post('{materiId}/questions', [MateriController::class, 'storeQuestion']);
+        Route::patch('{materiId}/questions/{id}', [MateriController::class, 'updateQuestion']);
+        Route::delete('{materiId}/questions/{id}', [MateriController::class, 'deleteQuestion']);
     });
 });
 
@@ -143,6 +149,7 @@ Route::prefix('v1/industries')->middleware(['auth:sanctum', 'role:admin'])->grou
 // Admin: student registrations / card verification
 Route::prefix('v1/registrations')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('students', [RegistrationController::class, 'listStudents']);
+    Route::get('students/cards', [RegistrationController::class, 'listCardVerification']);
     Route::post('students/{email}/approve', [RegistrationController::class, 'approve']);
     Route::post('students/{email}/reject', [RegistrationController::class, 'reject']);
 });

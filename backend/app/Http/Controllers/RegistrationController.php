@@ -27,6 +27,22 @@ class RegistrationController extends Controller
         ]);
     }
 
+    public function listCardVerification(Request $request): JsonResponse
+    {
+        $data = $this->registration->listCardVerification(
+            $request->integer('page') ?: null,
+            min($request->integer('per_page') ?: 5, 20),
+            (string) $request->query('search', ''),
+            (string) $request->query('status', ''),
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $data['data'],
+            'meta' => $data['meta'],
+        ]);
+    }
+
     public function approve(string $email): JsonResponse
     {
 try {

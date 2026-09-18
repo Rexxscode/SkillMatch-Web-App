@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   Save,
@@ -15,77 +15,118 @@ import {
 } from "lucide-react";
 import Card from "../../../components/ui/card";
 import Badge from "../../../components/ui/badge";
+import Pagination from "../../../components/ui/pagination";
 import DashboardHeader from "../../../components/layout/dashboardheader";
 import { MAJORS } from "../../../lib/materi-catalog";
 import {
-  fetchMajorQuizAdmin,
-  saveMajorQuizAdmin,
+  fetchMajorQuizAdminPage,
+  createMajorQuestion,
+  updateMajorQuestion,
+  deleteMajorQuestion,
   resetMajorQuizAdmin,
+  type AdminQuizMeta,
+  type AdminSkill,
 } from "../../../lib/major-quiz";
 import type { QuizQuestion } from "../../../lib/major-quiz";
 import { useToast } from "../../../lib/toast-context";
 import { ApiError } from "../../../lib/api";
 
 const DIFFICULTIES: QuizQuestion["difficulty"][] = ["basic", "intermediate", "advanced", "expert"];
+const PER_PAGE = 5;
 
 const FILTER_PILLS: { label: string; name: string }[] = [
   { label: "Semua", name: "" },
   ...MAJORS.map((m) => ({ label: m.short, name: m.name })),
 ];
 
-function genQuestionId(major: string, draft: QuizQuestion[]): string {
-  let max = 0;
-  draft.forEach((q) => {
-    const m = q.id.match(/(\d+)$/);
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  });
-  return `${major.toLowerCase().slice(0, 3)}-${String(max + 1).padStart(2, "0")}`;
+const EMPTY_META: AdminQuizMeta = {
+  total: 0,
+  per_page: PER_PAGE,
+  current_page: 1,
+  last_page: 1,
+  major: "all",
+  skills: [],
+};
+
+const isServerId = (id: string) => /^\d+$/.test(id);
+
+function newQuestionId(): string {
+  return `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 export default function AdminMajorQuizPage() {
   const { toast } = useToast();
   const [filterMajor, setFilterMajor] = useState("");
   const [editingMajor, setEditingMajor] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<AdminQuizMeta>(EMPTY_META);
   const [draft, setDraft] = useState<QuizQuestion[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [skillFilter, setSkillFilter] = useState("");
+  const [skills, setSkills] = useState<AdminSkill[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loadedCount, setLoadedCount] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const skills = editingMajor
-    ? [...new Set(draft.filter((q) => q.skill).map((q) => q.skill))]
-    : [];
+  const hasChanges = removedIds.length > 0 || draft.some((q) => !isServerId(q.id));
 
-  const openEditor = async (major: string) => {
-    setLoading(true);
-    setEditingMajor(major);
-    setSkillFilter("");
-    try {
-      const backendQuiz = await fetchMajorQuizAdmin(major);
-      if (backendQuiz.length > 0) {
-        setDraft(backendQuiz);
-        setLoadedCount(backendQuiz.length);
-      } else {
+  const loadPage = useCallback(
+    async (major: string, targetPage: number, skill: string) => {
+      setLoading(true);
+      try {
+        const res = await fetchMajorQuizAdminPage(major, {
+          page: targetPage,
+          perPage: PER_PAGE,
+          skill: skill || undefined,
+        });
+        setDraft(res.questions);
+        setMeta(res.meta);
+        setSkills(res.meta.skills ?? []);
+        setRemovedIds([]);
+        if (res.meta.last_page >= 1 && res.meta.current_page > res.meta.last_page) {
+          setPage(res.meta.last_page);
+        }
+      } catch (err) {
         setDraft([]);
-        setLoadedCount(0);
+        setMeta(EMPTY_META);
+        setSkills([]);
+        setRemovedIds([]);
+        toast(
+          err instanceof ApiError
+            ? `Gagal memuat soal (${err.status}): ${err.message}`
+            : "Gagal memuat soal dari server",
+          "warning",
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setDraft([]);
-      setLoadedCount(0);
-      toast(
-        err instanceof ApiError
-          ? `Gagal memuat soal (${err.status}): ${err.message}`
-          : "Gagal memuat soal dari server",
-        "warning",
-      );
-    } finally {
-      setLoading(false);
-    }
+    },
+    [toast],
+  );
+
+  useEffect(() => {
+    if (!editingMajor) return;
+    loadPage(editingMajor, page, skillFilter);
+  }, [editingMajor, page, skillFilter, refreshTick, loadPage]);
+
+  const openEditor = (major: string) => {
+    setEditingMajor(major);
+    setPage(1);
+    setSkillFilter("");
   };
 
-  const closeEditor = () => setEditingMajor(null);
+  const closeEditor = () => {
+    setEditingMajor(null);
+    setDraft([]);
+    setRemovedIds([]);
+    setMeta(EMPTY_META);
+    setSkills([]);
+  };
 
-  const visibleDraft = skillFilter ? draft.filter((q) => q.skill === skillFilter) : draft;
+  const changeSkill = (value: string) => {
+    setSkillFilter(value);
+    setPage(1);
+  };
 
   const updateQuestion = (index: number, patch: Partial<QuizQuestion>) => {
     setDraft((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
@@ -124,22 +165,25 @@ export default function AdminMajorQuizPage() {
     setDraft((prev) => [
       ...prev,
       {
-        id: genQuestionId(editingMajor, prev),
+        id: newQuestionId(),
         question: "",
         options: ["", "", "", "", ""],
         correct: 0,
         difficulty: "basic",
-        skill: "",
+        skill: skillFilter,
       },
     ]);
   };
 
   const removeQuestion = (index: number) => {
+    const q = draft[index];
+    if (q && isServerId(q.id)) {
+      setRemovedIds((prev) => (prev.includes(q.id) ? prev : [...prev, q.id]));
+    }
     setDraft((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = async () => {
-    if (!editingMajor) return;
+  const validateDraft = (): string[] => {
     const errors: string[] = [];
     draft.forEach((q, i) => {
       if (!q.question.trim()) errors.push(`Soal ${i + 1}: pertanyaan kosong`);
@@ -150,22 +194,62 @@ export default function AdminMajorQuizPage() {
       if (q.correct < 0 || q.correct >= q.options.length || !Number.isInteger(q.correct))
         errors.push(`Soal ${i + 1}: opsi jawaban benar tidak valid`);
     });
+    return errors;
+  };
+
+  const handleSavePage = async () => {
+    if (!editingMajor) return;
+    const errors = validateDraft();
     if (errors.length > 0) {
       toast(errors.slice(0, 3).join(" · "), "error");
       return;
     }
+
     setSaving(true);
+    let created = 0;
+    let updated = 0;
+    let deleted = 0;
+    let failure: string | null = null;
+
     try {
-      await saveMajorQuizAdmin(editingMajor, draft);
-      toast(`Soal tes jurusan diperbarui (${draft.length} soal)`);
+      for (const q of draft) {
+        if (isServerId(q.id)) {
+          await updateMajorQuestion(q.id, q);
+          updated++;
+        } else {
+          await createMajorQuestion(editingMajor, q);
+          created++;
+        }
+      }
+      for (const id of removedIds) {
+        await deleteMajorQuestion(id);
+        deleted++;
+      }
     } catch (err) {
-      const detail = err instanceof ApiError && err.errors
-        ? Object.values(err.errors).flat().join(" · ")
-        : err instanceof ApiError ? err.message : "Gagal menyimpan soal";
-      toast(detail, "warning");
+      failure =
+        err instanceof ApiError && err.errors
+          ? Object.values(err.errors).flat().join(" · ")
+          : err instanceof ApiError
+            ? err.message
+            : "Gagal menyimpan soal";
     } finally {
       setSaving(false);
     }
+
+    if (failure) {
+      toast(failure, "warning");
+    } else {
+      const parts: string[] = [];
+      if (created) parts.push(`${created} baru`);
+      if (updated) parts.push(`${updated} diperbarui`);
+      if (deleted) parts.push(`${deleted} dihapus`);
+      toast(parts.length ? `Halaman disimpan: ${parts.join(", ")}` : "Tidak ada perubahan pada halaman ini");
+    }
+
+    if (created > 0) {
+      setPage(Number.MAX_SAFE_INTEGER);
+    }
+    setRefreshTick((t) => t + 1);
   };
 
   const handleReset = async () => {
@@ -174,9 +258,10 @@ export default function AdminMajorQuizPage() {
     setSaving(true);
     try {
       await resetMajorQuizAdmin(editingMajor);
-      const fresh = await fetchMajorQuizAdmin(editingMajor);
-      setDraft(fresh.length > 0 ? fresh : []);
       toast("Soal dikembalikan ke versi default");
+      setPage(1);
+      setSkillFilter("");
+      setRefreshTick((t) => t + 1);
     } catch (err) {
       const detail = err instanceof ApiError
         ? `Gagal mereset (${err.status}): ${err.message}`
@@ -195,7 +280,7 @@ export default function AdminMajorQuizPage() {
       <div>
         <DashboardHeader
           title={`Kelola Soal Tes Jurusan: ${majorShort}`}
-          subtitle={`${majorFullName} · ${draft.length} soal Tes Jurusan`}
+          subtitle={`${majorFullName} · ${meta.total} soal Tes Jurusan`}
           actions={
             <button
               onClick={closeEditor}
@@ -209,12 +294,12 @@ export default function AdminMajorQuizPage() {
 
         <div className="flex flex-wrap gap-3 mb-6">
           <button
-            onClick={handleSave}
-            disabled={saving}
+            onClick={handleSavePage}
+            disabled={saving || loading}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-60"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Simpan Perubahan
+            Simpan Halaman
           </button>
           <button
             onClick={addQuestion}
@@ -235,18 +320,15 @@ export default function AdminMajorQuizPage() {
           {skills.length > 0 && (
             <select
               value={skillFilter}
-              onChange={(e) => setSkillFilter(e.target.value)}
+              onChange={(e) => changeSkill(e.target.value)}
               className="px-3 py-2 border border-border rounded-xl text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
-              <option value="">Semua Skill ({draft.length})</option>
-              {skills.map((s) => {
-                const count = draft.filter((q) => q.skill === s).length;
-                return (
-                  <option key={s} value={s}>
-                    {s} ({count})
-                  </option>
-                );
-              })}
+              <option value="">Semua Skill ({meta.total})</option>
+              {skills.map((s) => (
+                <option key={s.skill} value={s.skill}>
+                  {s.skill} ({s.count})
+                </option>
+              ))}
             </select>
           )}
         </div>
@@ -254,26 +336,30 @@ export default function AdminMajorQuizPage() {
         {loading ? (
           <Card className="text-center py-16">
             <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
-            <p className="text-muted text-sm">Memuat {loadedCount ? `${loadedCount} soal dari` : ""} server...</p>
+            <p className="text-muted text-sm">Memuat soal dari server...</p>
           </Card>
-        ) : visibleDraft.length === 0 ? (
+        ) : draft.length === 0 && !hasChanges ? (
           <Card className="text-center py-16">
             <FileQuestion className="w-12 h-12 text-muted mx-auto mb-3" />
-            <p className="text-foreground font-medium">Belum ada soal untuk jurusan ini</p>
+            <p className="text-foreground font-medium">Belum ada soal pada halaman ini</p>
             <p className="text-sm text-muted mt-1">Gunakan tombol Tambah Soal untuk membuat soal baru</p>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {visibleDraft.map((q, idx) => {
-              const qi = skillFilter ? draft.findIndex((d) => d.id === q.id) : idx;
-              return (
-                <Card key={q.id} className="p-5">
+          <>
+            <div className="space-y-4">
+              {draft.map((q, qi) => (
+                <Card key={q.id || qi} className="p-5">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
-                        {qi + 1}
+                        {(meta.current_page - 1) * PER_PAGE + qi + 1}
                       </span>
-                      <h4 className="font-semibold text-foreground text-sm">Soal {qi + 1}</h4>
+                      <h4 className="font-semibold text-foreground text-sm">
+                        Soal {(meta.current_page - 1) * PER_PAGE + qi + 1}
+                        {!isServerId(q.id) && (
+                          <span className="ml-2 text-xs font-normal text-emerald-600">Baru</span>
+                        )}
+                      </h4>
                     </div>
                     <button
                       onClick={() => removeQuestion(qi)}
@@ -373,9 +459,24 @@ export default function AdminMajorQuizPage() {
                     </select>
                   </div>
                 </Card>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+
+            <Pagination
+              currentPage={meta.current_page}
+              lastPage={meta.last_page}
+              total={meta.total}
+              perPage={meta.per_page}
+              onPageChange={setPage}
+              itemLabel="soal"
+            />
+
+            {removedIds.length > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
+                {removedIds.length} soal ditandai hapus — klik Simpan Halaman untuk menerapkan.
+              </p>
+            )}
+          </>
         )}
       </div>
     );

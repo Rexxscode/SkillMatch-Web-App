@@ -319,9 +319,126 @@ paths:
             type: string
             enum: [RPL, DKV, TJKT]
           description: Kode jurusan (opsional).
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+          description: Nomor halaman. Jika diisi, respons dikembalikan per halaman. Tanpa ini, seluruh soal dikembalikan.
+        - in: query
+          name: per_page
+          required: false
+          schema:
+            type: integer
+            default: 5
+            maximum: 50
+          description: Jumlah soal per halaman (default 5, maksimal 50).
+        - in: query
+          name: skill
+          required: false
+          schema:
+            type: string
+          description: Filter berdasarkan skill. meta.skills berisi daftar skill beserta jumlahnya.
       responses:
         "200":
           description: Daftar soal versi admin.
+
+  /v1/assessment/questions:
+    post:
+      tags: [Asesmen]
+      summary: Tambah soal asesmen (admin)
+      description: Menambahkan satu soal asesmen. Menghapus hasil asesmen jurusan terkait agar skor dihitung ulang. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [major, question, options, correct]
+              properties:
+                major:
+                  type: string
+                  enum: [RPL, DKV, TJKT]
+                question:
+                  type: string
+                options:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: string
+                correct:
+                  type: integer
+                  description: Indeks jawaban benar di options.
+                difficulty:
+                  type: string
+                  enum: [basic, intermediate, advanced]
+                skill:
+                  type: string
+      responses:
+        "201":
+          description: Soal berhasil dibuat.
+        "422":
+          description: Validasi gagal.
+
+  /v1/assessment/questions/{id}:
+    patch:
+      tags: [Asesmen]
+      summary: Ubah soal asesmen (admin)
+      description: Memperbarui satu soal asesmen. Menghapus hasil asesmen jurusan terkait agar skor dihitung ulang. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID soal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                question:
+                  type: string
+                options:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: string
+                correct:
+                  type: integer
+                difficulty:
+                  type: string
+                skill:
+                  type: string
+      responses:
+        "200":
+          description: Soal berhasil diperbarui.
+        "422":
+          description: Validasi gagal atau soal tidak ditemukan.
+    delete:
+      tags: [Asesmen]
+      summary: Hapus soal asesmen (admin)
+      description: Menghapus satu soal asesmen. Menghapus hasil asesmen jurusan terkait agar skor dihitung ulang. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID soal.
+      responses:
+        "200":
+          description: Soal berhasil dihapus.
+        "422":
+          description: Soal tidak ditemukan.
 
   /v1/assessment/submit:
     post:
@@ -495,9 +612,135 @@ paths:
           schema:
             type: string
           description: ID atau slug materi.
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+          description: Nomor halaman. Jika diisi, respons dikembalikan per halaman.
+        - in: query
+          name: per_page
+          required: false
+          schema:
+            type: integer
+            default: 5
+            maximum: 50
+          description: Jumlah soal per halaman (default 5, maksimal 50).
       responses:
         "200":
           description: Soal materi versi admin.
+
+  /v1/materi/{materiId}/questions:
+    post:
+      tags: [Materi]
+      summary: Tambah soal materi (admin)
+      description: Menambahkan satu soal ke suatu materi. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: path
+          name: materiId
+          required: true
+          schema:
+            type: string
+          description: ID atau slug materi.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question, options, correct]
+              properties:
+                question:
+                  type: string
+                options:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: string
+                correct:
+                  type: integer
+                  description: Indeks jawaban benar di options.
+                difficulty:
+                  type: string
+                skill:
+                  type: string
+      responses:
+        "201":
+          description: Soal berhasil dibuat.
+        "422":
+          description: Validasi gagal.
+
+  /v1/materi/{materiId}/questions/{id}:
+    patch:
+      tags: [Materi]
+      summary: Ubah soal materi (admin)
+      description: Memperbarui satu soal materi. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: path
+          name: materiId
+          required: true
+          schema:
+            type: string
+          description: ID atau slug materi.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID soal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                question:
+                  type: string
+                options:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: string
+                correct:
+                  type: integer
+                difficulty:
+                  type: string
+                skill:
+                  type: string
+      responses:
+        "200":
+          description: Soal berhasil diperbarui.
+        "422":
+          description: Validasi gagal atau soal tidak ditemukan.
+    delete:
+      tags: [Materi]
+      summary: Hapus soal materi (admin)
+      description: Menghapus satu soal materi. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: path
+          name: materiId
+          required: true
+          schema:
+            type: string
+          description: ID atau slug materi.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID soal.
+      responses:
+        "200":
+          description: Soal berhasil dihapus.
+        "422":
+          description: Soal tidak ditemukan.
 
   /v1/materi/{materiId}/submit:
     post:
@@ -1229,12 +1472,52 @@ paths:
     get:
       tags: [Registrasi Kartu]
       summary: Daftar siswa (verifikasi kartu)
-      description: Mengembalikan daftar siswa beserta status kartu untuk verifikasi. Memerlukan autentikasi admin.
+      description: Mengembalikan daftar siswa beserta status kartu untuk verifikasi. Memerlukan autentikasi admin. Untuk mengurangi muatan, gunakan endpoint /v1/registrations/students/cards yang ber-pagination.
       security:
         - sanctum: []
       responses:
         "200":
           description: Daftar siswa.
+
+  /v1/registrations/students/cards:
+    get:
+      tags: [Registrasi Kartu]
+      summary: Daftar siswa pemegang kartu (verifikasi, ber-pagination)
+      description: Mengembalikan hanya siswa yang memiliki kartu (tidak termasuk siswa belum upload kartu), diurutkan pending lebih dulu, dengan pagination. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Nomor halaman (default 1).
+        - in: query
+          name: per_page
+          required: false
+          schema:
+            type: integer
+            default: 5
+            maximum: 20
+          description: Jumlah siswa per halaman (default 5, maksimal 20).
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: Cari berdasarkan nama, email, jurusan, atau tingkat kelas.
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved]
+          description: Filter status kartu.
+      responses:
+        "200":
+          description: Daftar siswa pemegang kartu + meta pagination (termasuk pending_review).
 
   /v1/registrations/students/{email}/approve:
     post:

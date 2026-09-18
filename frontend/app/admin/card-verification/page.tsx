@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Search, Check, X, IdCard, Users, Eye, BadgeCheck, Loader2 } from "lucide-react";
 import Card from "../../components/ui/card";
 import Badge from "../../components/ui/badge";
+import Pagination from "../../components/ui/pagination";
 import DashboardHeader from "../../components/layout/dashboardheader";
 import { api, BACKEND_ENDPOINTS } from "../../lib/api";
 import { useToast } from "../../lib/toast-context";
@@ -14,65 +15,117 @@ type CardRow = {
   id: number;
   name: string;
   email: string;
+  major?: string | null;
   major_name?: string | null;
   grade?: string | null;
   studentCard?: string | null;
   cardStatus: "none" | "pending" | "approved" | string;
 };
 
+type CardsMeta = {
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  pending_review: number;
+};
+
+const PER_PAGE = 5;
+const STATUS_TABS: { label: string; value: "" | "pending" | "approved" }[] = [
+  { label: "Semua", value: "" },
+  { label: "Menunggu", value: "pending" },
+  { label: "Disetujui", value: "approved" },
+];
+
 export default function CardVerificationPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<CardRow[]>([]);
+  const [meta, setMeta] = useState<CardsMeta>({
+    total: 0,
+    per_page: PER_PAGE,
+    current_page: 1,
+    last_page: 1,
+    pending_review: 0,
+  });
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "pending" | "approved">("");
+  const [page, setPage] = useState(1);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [loading, setLoading] = useState(true);
-const [busy, setBusy] = useState<{ email: string; kind: "approve" | "reject" } | null>(null);
+  const [busy, setBusy] = useState<{ email: string; kind: "approve" | "reject" } | null>(null);
   const [preview, setPreview] = useState<{ name: string; img: string } | null>(null);
 
-  const refresh = async () => {
-    try {
-      const res = await api.get<{ success: boolean; data: CardRow[] }>(BACKEND_ENDPOINTS.registrations.list);
-      if (res.success) {
-        const all = res.data.filter((u) => !!u.studentCard);
-        all.sort((a, b) => {
-          const aApproved = a.cardStatus === "approved" ? 1 : 0;
-          const bApproved = b.cardStatus === "approved" ? 1 : 0;
-          return aApproved - bApproved;
-        });
-        setRows(all);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
-    refresh();
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          per_page: String(PER_PAGE),
+        });
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (statusFilter) params.set("status", statusFilter);
+
+        const res = await api.get<{
+          success: boolean;
+          data: CardRow[];
+          meta: CardsMeta;
+        }>(`${BACKEND_ENDPOINTS.registrations.cards}?${params.toString()}`);
+
+        if (cancelled) return;
+
+        if (res.success) {
+          setRows(res.data ?? []);
+          if (res.meta) {
+            setMeta(res.meta);
+            if (res.meta.last_page >= 1 && res.meta.current_page > res.meta.last_page) {
+              setPage(res.meta.last_page);
+            }
+          }
+        }
+      } catch {
+        // silently fail
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, debouncedSearch, statusFilter, refreshTick]);
+
+  const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
+
+  useEffect(() => {
     const handler = () => refresh();
     window.addEventListener("students-updated", handler);
     return () => window.removeEventListener("students-updated", handler);
-  }, []);
+  }, [refresh]);
 
-  const pendingCount = rows.filter((r) => r.cardStatus !== "approved").length;
-
-  const filtered = rows.filter((r) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (r.name || "").toLowerCase().includes(q) ||
-      (r.email || "").toLowerCase().includes(q) ||
-      (r.major_name || "").toLowerCase().includes(q) ||
-      (r.grade || "").toLowerCase().includes(q)
-    );
-  });
+  const changeStatus = (value: "" | "pending" | "approved") => {
+    setStatusFilter(value);
+    setPage(1);
+  };
 
   const runAction = async (email: string, kind: "approve" | "reject") => {
-if (busy !== null) return;
+    if (busy !== null) return;
     setBusy({ email, kind });
     try {
       await api.post(BACKEND_ENDPOINTS.registrations[kind](email));
-      await refresh();
+      refresh();
       window.dispatchEvent(new CustomEvent("students-updated"));
       if (kind === "approve") {
         addNotification({
@@ -99,6 +152,8 @@ if (busy !== null) return;
     }
   };
 
+  const hasFilter = !!debouncedSearch || !!statusFilter;
+
   return (
     <div>
       <DashboardHeader
@@ -107,110 +162,140 @@ if (busy !== null) return;
         role="admin"
       />
 
-      {pendingCount > 0 && (
+      {meta.pending_review > 0 && (
         <div className="mb-4 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-          {pendingCount} kartu menunggu verifikasi
+          {meta.pending_review} kartu menunggu verifikasi
         </div>
       )}
 
-      <div className="relative mb-6 max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-        <input
-          type="text"
-          placeholder="Cari nama, email, jurusan, atau kelas..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-input-bg text-foreground"
-        />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input
+            type="text"
+            placeholder="Cari nama, email, jurusan, atau kelas..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-input-bg text-foreground"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value || "all"}
+              type="button"
+              onClick={() => changeStatus(tab.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                statusFilter === tab.value
+                  ? "bg-primary text-white shadow"
+                  : "bg-card border border-border text-muted hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : rows.length === 0 ? (
         <Card className="text-center py-12">
           <Users className="w-12 h-12 text-muted mx-auto mb-3" />
           <p className="text-foreground font-medium">Belum ada kartu pelajar ditemukan</p>
           <p className="text-sm text-muted mt-1">
-            {search
-              ? "Coba ubah kata kunci pencarian"
+            {hasFilter
+              ? "Coba ubah kata kunci atau filter status"
               : "Siswa yang mengunggah kartu pelajar akan muncul di sini"}
           </p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((p) => {
-            const pending = p.cardStatus !== "approved";
-            return (
-              <Card key={p.email}>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {p.studentCard ? (
-                    <button
-                      type="button"
-                      onClick={() => setPreview({ name: p.name, img: p.studentCard as string })}
-                      title="Klik untuk memperbesar kartu pelajar"
-                      className="flex-shrink-0 group"
-                    >
-                      <img
-                        src={p.studentCard}
-                        alt={`Kartu pelajar ${p.name}`}
-                        className="h-28 w-40 object-cover rounded-xl border border-border transition-transform group-hover:scale-[1.02] group-hover:ring-2 group-hover:ring-primary/40 cursor-zoom-in"
-                      />
-                    </button>
-                  ) : (
-                    <div className="h-28 w-40 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                      <IdCard className="w-8 h-8 text-muted" />
-                    </div>
-                  )}
-                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-foreground">{p.name}</p>
-                      <p className="text-xs text-muted break-all">{p.email}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="primary">{p.major_name || "-"}</Badge>
-                        {p.grade && <Badge variant="secondary">Kelas {p.grade}</Badge>}
-                        {pending ? (
-                          <Badge variant="warning">Menunggu Verifikasi</Badge>
-                        ) : (
-                          <Badge variant="success">
-                            <span className="inline-flex items-center gap-1">
-                              <BadgeCheck className="w-3 h-3" /> Disetujui
-                            </span>
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    {pending && (
-                      <div className="flex gap-2 ml-auto sm:ml-0 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => runAction(p.email, "approve")}
-                          disabled={busy?.email === p.email && busy.kind === "approve"}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
-                        >
-                          {busy?.email === p.email && busy.kind === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Setujui
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => runAction(p.email, "reject")}
-                          disabled={busy?.email === p.email && busy.kind === "reject"}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-60"
-                        >
-                          {busy?.email === p.email && busy.kind === "reject" ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Tolak
-                        </button>
+        <>
+          <div className="space-y-3">
+            {rows.map((p) => {
+              const pending = p.cardStatus !== "approved";
+              return (
+                <Card key={p.email}>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {p.studentCard ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreview({ name: p.name, img: p.studentCard as string })}
+                        title="Klik untuk memperbesar kartu pelajar"
+                        className="flex-shrink-0 group"
+                      >
+                        <img
+                          src={p.studentCard}
+                          alt={`Kartu pelajar ${p.name}`}
+                          loading="lazy"
+                          className="h-28 w-40 object-cover rounded-xl border border-border transition-transform group-hover:scale-[1.02] group-hover:ring-2 group-hover:ring-primary/40 cursor-zoom-in"
+                        />
+                      </button>
+                    ) : (
+                      <div className="h-28 w-40 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                        <IdCard className="w-8 h-8 text-muted" />
                       </div>
                     )}
-                    {!pending && (
-                      <Eye className="w-4 h-4 text-muted hidden sm:block" />
-                    )}
+                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">{p.name}</p>
+                        <p className="text-xs text-muted break-all">{p.email}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge variant="primary">{p.major_name || p.major || "-"}</Badge>
+                          {p.grade && <Badge variant="secondary">Kelas {p.grade}</Badge>}
+                          {pending ? (
+                            <Badge variant="warning">Menunggu Verifikasi</Badge>
+                          ) : (
+                            <Badge variant="success">
+                              <span className="inline-flex items-center gap-1">
+                                <BadgeCheck className="w-3 h-3" /> Disetujui
+                              </span>
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      {pending && (
+                        <div className="flex gap-2 ml-auto sm:ml-0 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => runAction(p.email, "approve")}
+                            disabled={busy?.email === p.email && busy.kind === "approve"}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                          >
+                            {busy?.email === p.email && busy.kind === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Setujui
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => runAction(p.email, "reject")}
+                            disabled={busy?.email === p.email && busy.kind === "reject"}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-60"
+                          >
+                            {busy?.email === p.email && busy.kind === "reject" ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Tolak
+                          </button>
+                        </div>
+                      )}
+                      {!pending && (
+                        <Eye className="w-4 h-4 text-muted hidden sm:block" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          <Pagination
+            currentPage={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            perPage={meta.per_page}
+            onPageChange={setPage}
+            itemLabel="kartu"
+          />
+        </>
       )}
 
       {/* Kartu Pelajar Preview Modal */}

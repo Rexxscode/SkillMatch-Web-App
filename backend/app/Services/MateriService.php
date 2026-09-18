@@ -104,6 +104,120 @@ class MateriService
         ];
     }
 
+    public function paginatedAdminQuestions($materiId, int $perPage): array
+    {
+        $materi = $this->requireMateri($materiId);
+
+        $paginated = $this->materis->paginateQuestionsForMateri($materi->id, $perPage);
+
+        return [
+            'data' => $paginated->getCollection()->map(fn ($q) => $this->formatAdminQuestion($q))->all(),
+            'meta' => [
+                'total' => $paginated->total(),
+                'per_page' => $paginated->perPage(),
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'materi_id' => $materi->id,
+                'slug' => $materi->slug,
+                'major_id' => $materi->major_id,
+            ],
+        ];
+    }
+
+    public function createQuestion($materiId, array $data): array
+    {
+        $materi = $this->requireMateri($materiId);
+        $skillId = $this->resolveSkillId($data);
+
+        $question = $this->materis->createQuestion([
+            'materi_id' => $materi->id,
+            'skill_id' => $skillId,
+            'question' => $data['question'],
+            'options' => json_encode($data['options']),
+            'correct_index' => $data['correct'],
+            'difficulty' => $data['difficulty'] ?? 'basic',
+        ]);
+
+        return $this->formatAdminQuestion($question->fresh());
+    }
+
+    public function updateQuestion($materiId, int $id, array $data): array
+    {
+        $materi = $this->requireMateri($materiId);
+        $question = $this->materis->findQuestion($id);
+
+        if (!$question || $question->materi_id !== $materi->id) {
+            throw ValidationException::withMessages(['question' => 'Soal tidak ditemukan']);
+        }
+
+        $payload = [];
+        foreach (['question', 'correct', 'difficulty'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $payload[$field] = $data[$field];
+            }
+        }
+        if (array_key_exists('options', $data)) {
+            $payload['options'] = json_encode($data['options']);
+        }
+        $payload['skill_id'] = $this->resolveSkillId($data);
+
+        $this->materis->update($question, $payload);
+
+        return $this->formatAdminQuestion($question->fresh());
+    }
+
+    public function deleteQuestion($materiId, int $id): array
+    {
+        $materi = $this->requireMateri($materiId);
+        $question = $this->materis->findQuestion($id);
+
+        if (!$question || $question->materi_id !== $materi->id) {
+            throw ValidationException::withMessages(['question' => 'Soal tidak ditemukan']);
+        }
+
+        $this->materis->delete($question);
+
+        return ['id' => $id, 'materi_id' => $materi->id];
+    }
+
+    private function requireMateri($materiId): \App\Models\Materi
+    {
+        $materi = $this->materis->findBySlug($materiId) ?? $this->materis->findById($materiId);
+
+        if (!$materi) {
+            throw ValidationException::withMessages([
+                'materi' => 'Materi tidak ditemukan',
+            ]);
+        }
+
+        return $materi;
+    }
+
+    private function resolveSkillId(array $data): ?int
+    {
+        $skillId = $data['skill_id'] ?? null;
+
+        if ($skillId === null && !empty($data['skill'])) {
+            $skill = \App\Models\Skill::where('name', $data['skill'])->first();
+            $skillId = $skill?->id ?? null;
+        }
+
+        return $skillId ? (int) $skillId : null;
+    }
+
+    private function formatAdminQuestion($q): array
+    {
+        return [
+            'id' => $q->id,
+            'materi_id' => $q->materi_id,
+            'skill' => $q->skill_name,
+            'question' => $q->question,
+            'options' => $q->options,
+            'correct' => $q->correct_index,
+            'difficulty' => $q->difficulty,
+        ];
+    }
+
     public function submit(int $userId, $materiId, array $answers): array
     {
         $materi = $this->materis->findBySlug($materiId) ?? $this->materis->findById($materiId);

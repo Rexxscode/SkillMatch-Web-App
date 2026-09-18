@@ -45,6 +45,8 @@ export const BACKEND_ENDPOINTS = {
     questions: (major: string) => `/api/v1/assessment/questions/${encodeURIComponent(major)}`,
     adminQuestions: (major?: string) =>
       major ? `/api/v1/assessment/questions/admin/${encodeURIComponent(major)}` : "/api/v1/assessment/questions/admin",
+    storeQuestion: "/api/v1/assessment/questions",
+    question: (id: string | number) => `/api/v1/assessment/questions/${id}`,
     submit: "/api/v1/assessment/submit",
     results: "/api/v1/assessment/results",
     update: (major: string) => `/api/v1/assessment/questions?major=${encodeURIComponent(major)}`,
@@ -53,12 +55,15 @@ export const BACKEND_ENDPOINTS = {
   materiQuiz: {
     questions: (materiId: string) => `/api/v1/materi/${materiId}/questions`,
     adminQuestions: (materiId: string) => `/api/v1/materi/${materiId}/questions/admin`,
+    storeQuestion: (materiId: string) => `/api/v1/materi/${materiId}/questions`,
+    question: (materiId: string, id: string | number) => `/api/v1/materi/${materiId}/questions/${id}`,
     submit: (materiId: string) => `/api/v1/materi/${materiId}/submit`,
     update: (materiId: string) => `/api/v1/materi/${materiId}/questions`,
     reset: (materiId: string) => `/api/v1/materi/${materiId}/questions/reset`,
   },
   registrations: {
     list: "/api/v1/registrations/students",
+    cards: "/api/v1/registrations/students/cards",
     approve: (email: string) => `/api/v1/registrations/students/${email}/approve`,
     reject: (email: string) => `/api/v1/registrations/students/${email}/reject`,
     cardUpload: "/api/v1/registrations/students/card",

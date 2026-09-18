@@ -230,4 +230,186 @@ class AdminIntegrationFeatureTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_card_verification_paginated_only_card_holders()
+    {
+        $this->actingAs($this->adminUser());
+
+        $response = $this->getJson('/api/v1/registrations/students/cards?page=1&per_page=5');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'success',
+            'data' => [['id', 'name', 'email', 'major', 'major_name', 'grade', 'studentCard', 'cardStatus']],
+            'meta' => ['total', 'per_page', 'current_page', 'last_page', 'pending_review'],
+        ]);
+
+        $total = \App\Models\Student::where('card_status', '!=', 'none')->count();
+        $this->assertEquals($total, $response->json('meta.total'), 'Cards endpoint must only include card holders');
+        $this->assertEquals(5, $response->json('meta.per_page'));
+    }
+
+    public function test_card_verification_search_and_status_filters()
+    {
+        $this->actingAs($this->adminUser());
+
+        $cardholder = \App\Models\Student::where('card_status', '!=', 'none')->first();
+        $this->assertNotNull($cardholder, 'Test DB should have at least one card holder');
+        $email = $cardholder->user->email;
+
+        $byEmail = $this->getJson('/api/v1/registrations/students/cards?search=' . urlencode($email));
+        $byEmail->assertStatus(200);
+        $this->assertEquals(1, $byEmail->json('meta.total'));
+
+        $none = $this->getJson('/api/v1/registrations/students/cards?search=zzz_nothing');
+        $none->assertStatus(200);
+        $this->assertEquals(0, $none->json('meta.total'));
+
+        $pending = $this->getJson('/api/v1/registrations/students/cards?status=pending');
+        $pending->assertStatus(200);
+        $pendingCount = \App\Models\Student::where('card_status', '!=', 'none')->where('card_status', '!=', 'approved')->count();
+        $this->assertEquals($pendingCount, $pending->json('meta.total'));
+    }
+
+    public function test_admin_assessment_questions_paginated_with_skill_meta()
+    {
+        $this->actingAs($this->adminUser());
+
+        $total = \App\Models\AssessmentQuestion::where('major_id', 'RPL')->count();
+
+        $response = $this->getJson('/api/v1/assessment/questions/admin/RPL?page=2&per_page=5');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'success',
+            'data' => [['id', 'major_id', 'question', 'options', 'correct', 'difficulty', 'skill']],
+            'meta' => ['total', 'per_page', 'current_page', 'last_page', 'major', 'skills'],
+        ]);
+
+        $this->assertEquals($total, $response->json('meta.total'));
+        $this->assertEquals(5, $response->json('meta.per_page'));
+        $this->assertEquals(2, $response->json('meta.current_page'));
+        $this->assertEquals(ceil($total / 5), $response->json('meta.last_page'));
+        $this->assertGreaterThan(0, count($response->json('meta.skills')));
+
+        $data = $response->json('data');
+        $this->assertTrue(
+            collect($data)->every(fn ($q) => $q['major_id'] === 'RPL'),
+            'Paginated admin questions must only contain RPL questions'
+        );
+
+        $firstSkill = $data[0]['skill'];
+        $filtered = $this->getJson('/api/v1/assessment/questions/admin/RPL?skill=' . urlencode($firstSkill));
+        $filtered->assertStatus(200);
+        $this->assertTrue(
+            collect($filtered->json('data'))->every(fn ($q) => $q['skill'] === $firstSkill),
+            'Skill filter must return only questions with that skill'
+        );
+    }
+
+    public function test_admin_materi_questions_paginated()
+    {
+        $this->actingAs($this->adminUser());
+
+        $total = \App\Models\MateriQuestion::where('materi_id', 1)->count();
+
+        $response = $this->getJson('/api/v1/materi/1/questions/admin?page=1&per_page=5');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'success',
+            'data' => [['id', 'materi_id', 'skill', 'question', 'options', 'correct', 'difficulty']],
+            'meta' => ['total', 'per_page', 'current_page', 'last_page', 'materi_id', 'slug', 'major_id'],
+        ]);
+
+        $this->assertEquals($total, $response->json('meta.total'));
+        $this->assertEquals(5, count($response->json('data')));
+    }
+
+    public function test_assessment_question_create_update_delete_roundtrip()
+    {
+        $this->actingAs($this->adminUser());
+
+        $totalBefore = \App\Models\AssessmentQuestion::where('major_id', 'RPL')->count();
+
+        $created = $this->postJson('/api/v1/assessment/questions', [
+            'major' => 'RPL',
+            'question' => 'Soal percobaan pagination?',
+            'options' => ['Opsi A', 'Opsi B'],
+            'correct' => 1,
+            'difficulty' => 'basic',
+            'skill' => 'Test Skill',
+        ]);
+        $created->assertStatus(201);
+        $created->assertJsonPath('success', true);
+        $id = $created->json('data.id');
+        $this->assertNotNull($id);
+
+        try {
+            $this->assertEquals(
+                $totalBefore + 1,
+                \App\Models\AssessmentQuestion::where('major_id', 'RPL')->count(),
+                'Create must add one question'
+            );
+
+            $updated = $this->patchJson("/api/v1/assessment/questions/{$id}", [
+                'question' => 'Soal percobaan pagination (diubah)?',
+                'correct' => 0,
+            ]);
+            $updated->assertStatus(200);
+            $updated->assertJsonPath('data.question', 'Soal percobaan pagination (diubah)?');
+
+            $deleted = $this->deleteJson("/api/v1/assessment/questions/{$id}");
+            $deleted->assertStatus(200);
+            $deleted->assertJsonPath('success', true);
+        } finally {
+            \App\Models\AssessmentQuestion::where('id', $id)->delete();
+        }
+
+        $this->assertEquals(
+            $totalBefore,
+            \App\Models\AssessmentQuestion::where('major_id', 'RPL')->count(),
+            'Delete must restore question count'
+        );
+    }
+
+    public function test_materi_question_create_update_delete_roundtrip()
+    {
+        $this->actingAs($this->adminUser());
+
+        $totalBefore = \App\Models\MateriQuestion::where('materi_id', 1)->count();
+
+        $created = $this->postJson('/api/v1/materi/1/questions', [
+            'question' => 'Soal materi percobaan pagination?',
+            'options' => ['Pilihan A', 'Pilihan B'],
+            'correct' => 0,
+            'difficulty' => 'basic',
+            'skill' => 'Test Skill',
+        ]);
+        $created->assertStatus(201);
+        $created->assertJsonPath('success', true);
+        $id = $created->json('data.id');
+        $this->assertNotNull($id);
+
+        try {
+            $this->assertEquals(
+                $totalBefore + 1,
+                \App\Models\MateriQuestion::where('materi_id', 1)->count()
+            );
+
+            $updated = $this->patchJson("/api/v1/materi/1/questions/{$id}", [
+                'question' => 'Soal materi percobaan pagination (diubah)?',
+            ]);
+            $updated->assertStatus(200);
+            $updated->assertJsonPath('data.question', 'Soal materi percobaan pagination (diubah)?');
+
+            $deleted = $this->deleteJson("/api/v1/materi/1/questions/{$id}");
+            $deleted->assertStatus(200);
+            $deleted->assertJsonPath('success', true);
+        } finally {
+            \App\Models\MateriQuestion::where('id', $id)->delete();
+        }
+
+        $this->assertEquals($totalBefore, \App\Models\MateriQuestion::where('materi_id', 1)->count());
+    }
 }

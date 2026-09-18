@@ -51,6 +51,37 @@ class StudentRepository extends Repository
         return $query->paginate($perPage);
     }
 
+    public function paginateCardHolders(int $perPage, string $search = '', string $status = '')
+    {
+        $query = Student::with(['user', 'major'])
+            ->where('card_status', '!=', 'none');
+
+        if ($status === 'pending') {
+            $query->where('card_status', '!=', 'approved');
+        } elseif ($status === 'approved') {
+            $query->where('card_status', 'approved');
+        }
+
+        if ($search) {
+            $like = "%{$search}%";
+            $query->where(function ($q) use ($like) {
+                $q->where('major_id', 'like', $like)
+                    ->orWhere('grade', 'like', $like)
+                    ->orWhereHas('user', fn ($uq) =>
+                        $uq->where('name', 'like', $like)
+                            ->orWhere('email', 'like', $like)
+                    )
+                    ->orWhereHas('major', fn ($mq) => $mq->where('name', 'like', $like));
+            });
+        }
+
+        // Pending (belum disetujui) tampil lebih dulu, lalu urut nama/id stabil.
+        $query->orderByRaw("CASE WHEN card_status = 'approved' THEN 1 ELSE 0 END")
+            ->orderBy('id');
+
+        return $query->paginate($perPage);
+    }
+
     public function findByEmail(string $email): ?Student
     {
         return Student::whereHas('user', fn ($q) => $q->where('email', $email))

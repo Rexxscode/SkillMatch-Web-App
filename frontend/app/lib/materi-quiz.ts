@@ -66,32 +66,99 @@ type ApiAdminQuestion = {
   skill: string;
 };
 
-export async function fetchMateriQuizAdmin(materiId: string): Promise<QuizQuestion[]> {
-  const res = await api.get<{ success: boolean; data: ApiAdminQuestion[] }>(
-    BACKEND_ENDPOINTS.materiQuiz.adminQuestions(materiId),
-  );
-  if (!res.success) return [];
-  return res.data.map((q) => ({
+export type AdminQuizMeta = {
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  materi_id?: number;
+  slug?: string;
+  major_id?: string;
+};
+
+export type AdminQuizPage = {
+  questions: QuizQuestion[];
+  meta: AdminQuizMeta;
+};
+
+function mapAdminQuestion(q: ApiAdminQuestion): QuizQuestion {
+  return {
     id: String(q.id),
     question: q.question,
     options: Array.isArray(q.options) ? q.options : JSON.parse(q.options),
     correct: q.correct,
     difficulty: (q.difficulty || "basic") as QuizQuestion["difficulty"],
     skill: q.skill || "",
-  }));
+  };
 }
 
-export async function saveMateriQuizAdmin(materiId: string, questions: QuizQuestion[]): Promise<boolean> {
-  await api.put(BACKEND_ENDPOINTS.materiQuiz.update(materiId), {
-    questions: questions.map((q) => ({
-      question: q.question.trim(),
-      options: q.options.map((o) => o.trim()),
-      correct: q.correct,
-      difficulty: q.difficulty,
-      skill: q.skill.trim(),
-    })),
-  });
-  return true;
+function toQuestionPayload(q: QuizQuestion) {
+  return {
+    question: q.question.trim(),
+    options: q.options.map((o) => o.trim()),
+    correct: q.correct,
+    difficulty: q.difficulty,
+    skill: q.skill.trim(),
+  };
+}
+
+export async function fetchMateriQuizAdminPage(
+  materiId: string,
+  opts: { page?: number; perPage?: number } = {},
+): Promise<AdminQuizPage> {
+  const params = new URLSearchParams();
+  if (opts.page) params.set("page", String(opts.page));
+  if (opts.perPage) params.set("per_page", String(opts.perPage));
+  const qs = params.toString();
+  const base = BACKEND_ENDPOINTS.materiQuiz.adminQuestions(materiId);
+
+  const res = await api.get<{
+    success: boolean;
+    data: ApiAdminQuestion[];
+    meta: AdminQuizMeta;
+  }>(qs ? `${base}?${qs}` : base);
+
+  return {
+    questions: (res.data ?? []).map(mapAdminQuestion),
+    meta:
+      res.meta ??
+      {
+        total: 0,
+        per_page: opts.perPage ?? 5,
+        current_page: opts.page ?? 1,
+        last_page: 1,
+      },
+  };
+}
+
+export async function createMateriQuestion(
+  materiId: string,
+  q: QuizQuestion,
+): Promise<QuizQuestion> {
+  const res = await api.post<{ success: boolean; data: ApiAdminQuestion }>(
+    BACKEND_ENDPOINTS.materiQuiz.storeQuestion(materiId),
+    toQuestionPayload(q),
+  );
+  return mapAdminQuestion(res.data);
+}
+
+export async function updateMateriQuestion(
+  materiId: string,
+  id: string | number,
+  q: QuizQuestion,
+): Promise<QuizQuestion> {
+  const res = await api.patch<{ success: boolean; data: ApiAdminQuestion }>(
+    BACKEND_ENDPOINTS.materiQuiz.question(materiId, id),
+    toQuestionPayload(q),
+  );
+  return mapAdminQuestion(res.data);
+}
+
+export async function deleteMateriQuestion(
+  materiId: string,
+  id: string | number,
+): Promise<void> {
+  await api.delete(BACKEND_ENDPOINTS.materiQuiz.question(materiId, id));
 }
 
 export async function resetMateriQuizAdmin(materiId: string): Promise<boolean> {

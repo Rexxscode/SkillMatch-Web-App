@@ -37,14 +37,92 @@ class MateriController extends Controller
         ]);
     }
 
-    public function adminQuestions($materiId): JsonResponse
+    public function adminQuestions(Request $request, $materiId): JsonResponse
     {
-        $data = $this->materi->adminQuestions($materiId);
+        if ($request->integer('page')) {
+            $data = $this->materi->paginatedAdminQuestions(
+                $materiId,
+                min($request->integer('per_page') ?: 5, 50),
+            );
+        } else {
+            $data = $this->materi->adminQuestions($materiId);
+        }
 
         return response()->json([
             'success' => true,
             'data' => $data['data'],
             'meta' => $data['meta'],
+        ]);
+    }
+
+    public function storeQuestion(Request $request, $materiId): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'question' => 'required|string',
+            'options' => 'required|array|min:2',
+            'options.*' => 'string',
+            'correct' => 'required|integer|min:0',
+            'difficulty' => 'nullable|string',
+            'skill' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $this->materi->createQuestion($materiId, $request->only([
+            'question', 'options', 'correct', 'difficulty', 'skill',
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Question created',
+            'data' => $data,
+        ], 201);
+    }
+
+    public function updateQuestion(Request $request, $materiId, int $id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'question' => 'sometimes|required|string',
+            'options' => 'sometimes|required|array|min:2',
+            'options.*' => 'string',
+            'correct' => 'sometimes|required|integer|min:0',
+            'difficulty' => 'nullable|string',
+            'skill' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $this->materi->updateQuestion($materiId, $id, $request->only([
+            'question', 'options', 'correct', 'difficulty', 'skill',
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Question updated',
+            'data' => $data,
+        ]);
+    }
+
+    public function deleteQuestion($materiId, int $id): JsonResponse
+    {
+        $data = $this->materi->deleteQuestion($materiId, $id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Question deleted',
+            'data' => $data,
         ]);
     }
 

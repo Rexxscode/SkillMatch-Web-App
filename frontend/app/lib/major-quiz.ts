@@ -4933,34 +4933,99 @@ type ApiAssessmentQuestion = {
   skill: string;
 };
 
-export async function fetchMajorQuizAdmin(major?: string): Promise<QuizQuestion[]> {
-  const url = major
-    ? BACKEND_ENDPOINTS.assessment.adminQuestions(major)
-    : BACKEND_ENDPOINTS.assessment.adminQuestions();
-  const res = await api.get<{ success: boolean; data: ApiAssessmentQuestion[] }>(url);
-  if (!res.success) return [];
-  return res.data.map((q) => ({
+export type AdminSkill = { skill: string; count: number };
+
+export type AdminQuizMeta = {
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  major: string;
+  skills: AdminSkill[];
+};
+
+export type AdminQuizPage = {
+  questions: QuizQuestion[];
+  meta: AdminQuizMeta;
+};
+
+function mapAdminQuestion(q: ApiAssessmentQuestion): QuizQuestion {
+  return {
     id: String(q.id),
     question: q.question,
     options: Array.isArray(q.options) ? q.options : JSON.parse(q.options),
     correct: q.correct,
     difficulty: (q.difficulty || "basic") as QuizQuestion["difficulty"],
     skill: q.skill || "",
-  }));
+  };
 }
 
-export async function saveMajorQuizAdmin(major: string, questions: QuizQuestion[]): Promise<boolean> {
-  await api.put(BACKEND_ENDPOINTS.assessment.update(major), {
-    major,
-    questions: questions.map((q) => ({
-      question: q.question.trim(),
-      options: q.options.map((o) => o.trim()),
-      correct: q.correct,
-      difficulty: q.difficulty,
-      skill: q.skill.trim(),
-    })),
-  });
-  return true;
+function toQuestionPayload(q: QuizQuestion) {
+  return {
+    question: q.question.trim(),
+    options: q.options.map((o) => o.trim()),
+    correct: q.correct,
+    difficulty: q.difficulty,
+    skill: q.skill.trim(),
+  };
+}
+
+export async function fetchMajorQuizAdminPage(
+  major: string | undefined,
+  opts: { page?: number; perPage?: number; skill?: string } = {},
+): Promise<AdminQuizPage> {
+  const params = new URLSearchParams();
+  if (opts.page) params.set("page", String(opts.page));
+  if (opts.perPage) params.set("per_page", String(opts.perPage));
+  if (opts.skill) params.set("skill", opts.skill);
+
+  const base = major
+    ? BACKEND_ENDPOINTS.assessment.adminQuestions(major)
+    : BACKEND_ENDPOINTS.assessment.adminQuestions();
+  const qs = params.toString();
+
+  const res = await api.get<{
+    success: boolean;
+    data: ApiAssessmentQuestion[];
+    meta: AdminQuizMeta;
+  }>(qs ? `${base}?${qs}` : base);
+
+  return {
+    questions: (res.data ?? []).map(mapAdminQuestion),
+    meta:
+      res.meta ??
+      {
+        total: 0,
+        per_page: opts.perPage ?? 5,
+        current_page: opts.page ?? 1,
+        last_page: 1,
+        major: major ?? "all",
+        skills: [],
+      },
+  };
+}
+
+export async function createMajorQuestion(major: string, q: QuizQuestion): Promise<QuizQuestion> {
+  const res = await api.post<{ success: boolean; data: ApiAssessmentQuestion }>(
+    BACKEND_ENDPOINTS.assessment.storeQuestion,
+    { major, ...toQuestionPayload(q) },
+  );
+  return mapAdminQuestion(res.data);
+}
+
+export async function updateMajorQuestion(
+  id: string | number,
+  q: QuizQuestion,
+): Promise<QuizQuestion> {
+  const res = await api.patch<{ success: boolean; data: ApiAssessmentQuestion }>(
+    BACKEND_ENDPOINTS.assessment.question(id),
+    toQuestionPayload(q),
+  );
+  return mapAdminQuestion(res.data);
+}
+
+export async function deleteMajorQuestion(id: string | number): Promise<void> {
+  await api.delete(BACKEND_ENDPOINTS.assessment.question(id));
 }
 
 export async function resetMajorQuizAdmin(major: string): Promise<boolean> {
