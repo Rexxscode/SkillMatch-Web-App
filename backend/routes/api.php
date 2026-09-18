@@ -150,6 +150,7 @@ Route::prefix('v1/industries')->middleware(['auth:sanctum', 'role:admin'])->grou
 Route::prefix('v1/registrations')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('students', [RegistrationController::class, 'listStudents']);
     Route::get('students/cards', [RegistrationController::class, 'listCardVerification']);
+    Route::get('students/{email}/card', [RegistrationController::class, 'showCard']);
     Route::post('students/{email}/approve', [RegistrationController::class, 'approve']);
     Route::post('students/{email}/reject', [RegistrationController::class, 'reject']);
 });

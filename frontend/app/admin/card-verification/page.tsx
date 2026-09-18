@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Search, Check, X, IdCard, Users, Eye, BadgeCheck, Loader2 } from "lucide-react";
 import Card from "../../components/ui/card";
@@ -18,7 +18,7 @@ type CardRow = {
   major?: string | null;
   major_name?: string | null;
   grade?: string | null;
-  studentCard?: string | null;
+  hasCard: boolean;
   cardStatus: "none" | "pending" | "approved" | string;
 };
 
@@ -53,6 +53,7 @@ export default function CardVerificationPage() {
   const [page, setPage] = useState(1);
   const [refreshTick, setRefreshTick] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [images, setImages] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<{ email: string; kind: "approve" | "reject" } | null>(null);
   const [preview, setPreview] = useState<{ name: string; img: string } | null>(null);
 
@@ -108,6 +109,27 @@ export default function CardVerificationPage() {
   }, [page, debouncedSearch, statusFilter, refreshTick]);
 
   const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
+
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    rows.forEach((row) => {
+      if (!row.hasCard || images[row.email] || fetchedRef.current.has(row.email)) return;
+      fetchedRef.current.add(row.email);
+      api
+        .get<{ success: boolean; data: { studentCard?: string | null } }>(
+          BACKEND_ENDPOINTS.registrations.card(row.email),
+        )
+        .then((res) => {
+          if (res.success && res.data?.studentCard) {
+            setImages((prev) => ({ ...prev, [row.email]: res.data.studentCard as string }));
+          }
+        })
+        .catch(() => {
+          fetchedRef.current.delete(row.email);
+        });
+    });
+  }, [rows]);
 
   useEffect(() => {
     const handler = () => refresh();
@@ -220,20 +242,26 @@ export default function CardVerificationPage() {
               return (
                 <Card key={p.email}>
                   <div className="flex flex-col sm:flex-row gap-4">
-                    {p.studentCard ? (
-                      <button
-                        type="button"
-                        onClick={() => setPreview({ name: p.name, img: p.studentCard as string })}
-                        title="Klik untuk memperbesar kartu pelajar"
-                        className="flex-shrink-0 group"
-                      >
-                        <img
-                          src={p.studentCard}
-                          alt={`Kartu pelajar ${p.name}`}
-                          loading="lazy"
-                          className="h-28 w-40 object-cover rounded-xl border border-border transition-transform group-hover:scale-[1.02] group-hover:ring-2 group-hover:ring-primary/40 cursor-zoom-in"
-                        />
-                      </button>
+                    {images[p.email] || p.hasCard ? (
+                      images[p.email] ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreview({ name: p.name, img: images[p.email] as string })}
+                          title="Klik untuk memperbesar kartu pelajar"
+                          className="flex-shrink-0 group"
+                        >
+                          <img
+                            src={images[p.email]}
+                            alt={`Kartu pelajar ${p.name}`}
+                            loading="lazy"
+                            className="h-28 w-40 object-cover rounded-xl border border-border transition-transform group-hover:scale-[1.02] group-hover:ring-2 group-hover:ring-primary/40 cursor-zoom-in"
+                          />
+                        </button>
+                      ) : (
+                        <div className="h-28 w-40 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )
                     ) : (
                       <div className="h-28 w-40 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
                         <IdCard className="w-8 h-8 text-muted" />

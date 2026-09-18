@@ -1519,6 +1519,25 @@ paths:
         "200":
           description: Daftar siswa pemegang kartu + meta pagination (termasuk pending_review).
 
+  /v1/registrations/students/{email}/card:
+    get:
+      tags: [Registrasi Kartu]
+      summary: Ambil gambar kartu pelajar satu siswa
+      description: Mengembalikan gambar kartu pelajar (base64) untuk satu siswa. Dipakai admin untuk memuat thumbnail sesuai permintaan agar daftar tetap ringan. Memerlukan autentikasi admin.
+      security:
+        - sanctum: []
+      parameters:
+        - in: path
+          name: email
+          required: true
+          schema:
+            type: string
+            format: email
+          description: Email siswa pemegang kartu.
+      responses:
+        "200":
+          description: Gambar kartu pelajar siswa.
+
   /v1/registrations/students/{email}/approve:
     post:
       tags: [Registrasi Kartu]

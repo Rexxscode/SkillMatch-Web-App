@@ -64,6 +64,8 @@ export const BACKEND_ENDPOINTS = {
   registrations: {
     list: "/api/v1/registrations/students",
     cards: "/api/v1/registrations/students/cards",
+    card: (email: string) =>
+      `/api/v1/registrations/students/${encodeURIComponent(email)}/card`,
     approve: (email: string) => `/api/v1/registrations/students/${email}/approve`,
     reject: (email: string) => `/api/v1/registrations/students/${email}/reject`,
     cardUpload: "/api/v1/registrations/students/card",

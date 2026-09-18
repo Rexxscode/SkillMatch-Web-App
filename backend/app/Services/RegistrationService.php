@@ -44,7 +44,7 @@ class RegistrationService
             'major' => $student->major_id,
             'major_name' => $student->major?->name,
             'grade' => $student->grade,
-            'studentCard' => $student->student_card,
+            'hasCard' => (bool) $student->student_card,
             'cardStatus' => $student->card_status ?? 'none',
         ]);
 
@@ -61,6 +61,18 @@ class RegistrationService
                 'last_page' => $paginated->lastPage(),
                 'pending_review' => $pendingReview,
             ],
+        ];
+    }
+
+    public function getStudentCard(string $email): array
+    {
+        $student = $this->requireStudentByEmail($email);
+
+        return [
+            'email' => $email,
+            'hasCard' => (bool) $student->student_card,
+            'studentCard' => $student->student_card,
+            'cardStatus' => $student->card_status ?? 'none',
         ];
     }
 

@@ -240,13 +240,37 @@ class AdminIntegrationFeatureTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'success',
-            'data' => [['id', 'name', 'email', 'major', 'major_name', 'grade', 'studentCard', 'cardStatus']],
+            'data' => [['id', 'name', 'email', 'major', 'major_name', 'grade', 'hasCard', 'cardStatus']],
             'meta' => ['total', 'per_page', 'current_page', 'last_page', 'pending_review'],
         ]);
 
         $total = \App\Models\Student::where('card_status', '!=', 'none')->count();
         $this->assertEquals($total, $response->json('meta.total'), 'Cards endpoint must only include card holders');
         $this->assertEquals(5, $response->json('meta.per_page'));
+
+        $card = $response->json('data.0');
+        $this->assertTrue($card['hasCard'], 'List must not include card image payload, only hasCard flag');
+    }
+
+    public function test_card_image_fetched_on_demand()
+    {
+        $this->actingAs($this->adminUser());
+
+        $cardholder = \App\Models\Student::where('card_status', '!=', 'none')->first();
+        $this->assertNotNull($cardholder);
+
+        $email = $cardholder->user->email;
+        $cardStatus = $cardholder->card_status;
+
+        $response = $this->getJson('/api/v1/registrations/students/' . urlencode($email) . '/card');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'success',
+            'data' => ['email', 'hasCard', 'studentCard', 'cardStatus'],
+        ]);
+        $this->assertEquals($cardStatus, $response->json('data.cardStatus'));
+        $this->assertEquals($email, $response->json('data.email'));
     }
 
     public function test_card_verification_search_and_status_filters()

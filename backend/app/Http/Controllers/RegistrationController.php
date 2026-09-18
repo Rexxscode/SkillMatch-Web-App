@@ -43,6 +43,16 @@ class RegistrationController extends Controller
         ]);
     }
 
+    public function showCard(string $email): JsonResponse
+    {
+        $data = $this->registration->getStudentCard($email);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
     public function approve(string $email): JsonResponse
     {
 try {
