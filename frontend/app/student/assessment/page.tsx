@@ -46,6 +46,14 @@ function getLevelFromScore(correct: number, total: number): number {
   return 1;
 }
 
+const serverLevelMap: Record<string, number> = {
+  beginner: 1,
+  developing: 2,
+  intermediate: 3,
+  advanced: 4,
+  expert: 5,
+};
+
 function getLevelLabel(level: number): string {
   const labels = ["", "Belum", "Dasar", "Menengah", "Mahir", "Ahli"];
   return labels[level] || "";
@@ -122,18 +130,32 @@ export default function AssessmentPage() {
 
   const goToStep = async (step: number) => {
     if (step === 3) {
-      const result = gradeQuiz(quizAnswers, quizQuestions);
-      setQuizResult(result);
-      saveQuizResult(result);
-      saveQuizAnswers(quizAnswers);
+      let result: QuizResult;
 
       try {
-        await api.post(BACKEND_ENDPOINTS.assessment.submit, {
+        const res = await api.post<{
+          success: boolean;
+          data: {
+            score: number;
+            total: number;
+            percentage: number;
+            level: string;
+            skill_scores: Record<string, { correct: number; total: number }>;
+          };
+        }>(BACKEND_ENDPOINTS.assessment.submit, {
           major: currentUser.major,
           answers: quizAnswers,
         });
+
+        result = {
+          score: res.data.percentage,
+          level: serverLevelMap[res.data.level] ?? getLevelFromScore(res.data.score, res.data.total),
+          skillScores: res.data.skill_scores,
+        };
         setSubmitError(null);
       } catch (err) {
+        result = gradeQuiz(quizAnswers, quizQuestions);
+
         setSubmitError(
           err instanceof ApiError
             ? `Hasil belum tersimpan ke server (${err.status}): ${err.message}`
@@ -148,6 +170,10 @@ export default function AssessmentPage() {
           "warning",
         );
       }
+
+      setQuizResult(result);
+      saveQuizResult(result);
+      saveQuizAnswers(quizAnswers);
 
       const careerMatches = generateCareerMatches(majorName, result);
       saveCareerMatches(careerMatches);
