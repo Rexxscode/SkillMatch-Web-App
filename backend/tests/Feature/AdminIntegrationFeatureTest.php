@@ -90,6 +90,23 @@ class AdminIntegrationFeatureTest extends TestCase
         );
     }
 
+    public function test_admin_questions_accepts_full_major_name_alias()
+    {
+        $this->actingAs($this->adminUser());
+
+        $response = $this->getJson('/api/v1/assessment/questions/admin/' . urlencode('Rekayasa Perangkat Lunak'));
+
+        $response->assertStatus(200);
+        $this->assertEquals('RPL', $response->json('meta.major'));
+
+        $data = $response->json('data');
+        $this->assertGreaterThan(0, count($data), 'Admin questions empty for full major name');
+        $this->assertTrue(
+            collect($data)->every(fn ($q) => $q['major_id'] === 'RPL'),
+            'Admin questions must only contain RPL questions when filtered by full major name'
+        );
+    }
+
     public function test_admin_materi_questions_expose_correct()
     {
         $this->actingAs($this->adminUser());

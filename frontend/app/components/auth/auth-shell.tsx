@@ -25,7 +25,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
       />
 
       <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-2xl grid lg:grid-cols-2">
-        <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary-dark to-secondary p-10 text-white">
+        <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary p-10 text-white">
           <div
             className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-white/10 blur-2xl"
             aria-hidden

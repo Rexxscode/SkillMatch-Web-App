@@ -9,13 +9,33 @@ use Illuminate\Support\Facades\Validator;
 
 class AssessmentController extends Controller
 {
+    /** Alias nama jurusan lengkap -> kode singkat, agar filter aman dari frontend lama. */
+    private const MAJOR_ALIASES = [
+        'rekayasa perangkat lunak' => 'RPL',
+        'desain komunikasi visual' => 'DKV',
+        'teknik jaringan, komputer, dan telekomunikasi' => 'TJKT',
+    ];
+
     public function __construct(
         private AssessmentService $assessment,
     ) {}
 
+    private function normalizeMajor(?string $major): ?string
+    {
+        if ($major === null) {
+            return null;
+        }
+
+        $trimmed = trim($major);
+        $lower = mb_strtolower($trimmed);
+        $lower = preg_replace('/\s+/', ' ', str_replace('+', ' ', $lower));
+
+        return self::MAJOR_ALIASES[$lower] ?? mb_strtoupper($lower);
+    }
+
     public function questions($major = null): JsonResponse
     {
-        $data = $this->assessment->questions($major);
+        $data = $this->assessment->questions($this->normalizeMajor($major));
 
         return response()->json([
             'success' => true,
@@ -26,7 +46,7 @@ class AssessmentController extends Controller
 
     public function adminQuestions(Request $request, $major = null): JsonResponse
     {
-        $major = $major ?? $request->query('major');
+        $major = $this->normalizeMajor($major ?? $request->query('major'));
 
         $data = $this->assessment->adminQuestions($major);
 
@@ -39,6 +59,8 @@ class AssessmentController extends Controller
 
     public function submit(Request $request): JsonResponse
     {
+        $request->merge(['major' => $this->normalizeMajor($request->input('major')) ?? $request->input('major')]);
+
         $validator = Validator::make($request->all(), [
             'major' => 'required|string|in:RPL,DKV,TJKT',
             'answers' => 'required|array',
@@ -73,6 +95,8 @@ class AssessmentController extends Controller
 
     public function updateQuestions(Request $request): JsonResponse
     {
+        $request->merge(['major' => $this->normalizeMajor($request->input('major')) ?? $request->input('major')]);
+
         $validator = Validator::make($request->all([
             'major',
             'questions',
@@ -100,6 +124,8 @@ class AssessmentController extends Controller
 
     public function resetQuestions(Request $request): JsonResponse
     {
+        $request->merge(['major' => $this->normalizeMajor($request->input('major')) ?? $request->input('major')]);
+
         $validator = Validator::make($request->all([
             'major',
         ]), [
