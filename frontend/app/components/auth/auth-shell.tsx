@@ -24,7 +24,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
         aria-hidden
       />
 
-      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-2xl grid lg:grid-cols-2">
+      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-2xl grid grid-cols-1 lg:grid-cols-2">
         <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary p-10 text-white">
           <div
             className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-white/10 blur-2xl"
@@ -68,7 +68,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           </ul>
         </div>
 
-        <div className="flex flex-col justify-center p-6 sm:p-10 lg:p-12">{children}</div>
+        <div className="flex flex-col justify-center p-6 sm:p-10 lg:p-12 min-w-0">{children}</div>
       </div>
     </div>
   );
