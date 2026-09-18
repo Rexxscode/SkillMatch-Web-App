@@ -34,12 +34,17 @@ class StudentRepository extends Repository
 
     public function withRelations(): Collection
     {
-        return Student::with(['user', 'major'])->get();
+        return Student::query()
+            ->select(['id', 'user_id', 'major_id', 'grade', 'avatar', 'created_at'])
+            ->with(['user', 'major'])
+            ->get();
     }
 
     public function paginateWithRelations(int $perPage, string $search = '')
     {
-        $query = Student::with(['user', 'major']);
+        $query = Student::query()
+            ->select(['id', 'user_id', 'major_id', 'grade', 'avatar', 'created_at'])
+            ->with(['user', 'major']);
 
         if ($search) {
             $query->whereHas('user', fn ($q) =>
