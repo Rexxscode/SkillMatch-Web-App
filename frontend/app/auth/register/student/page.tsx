@@ -103,7 +103,7 @@ export default function StudentRegisterPage() {
                   placeholder="Masukkan nama lengkap"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-border rounded-xl text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  className="w-full pl-10 pr-4 py-3 sm:py-2.5 border border-border rounded-xl text-base sm:text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                 />
               </div>
             </div>
@@ -120,7 +120,7 @@ export default function StudentRegisterPage() {
                   placeholder="nama@siswa.smk.id"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-border rounded-xl text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  className="w-full pl-10 pr-4 py-3 sm:py-2.5 border border-border rounded-xl text-base sm:text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                 />
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function StudentRegisterPage() {
                     id="major"
                     value={major}
                     onChange={(e) => setMajor(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-border rounded-xl text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors appearance-none"
+                    className="w-full pl-10 pr-4 py-3 sm:py-2.5 border border-border rounded-xl text-base sm:text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors appearance-none"
                   >
                     <option value="">Pilih</option>
                     <option value="rpl">Rekayasa Perangkat Lunak</option>
@@ -153,7 +153,7 @@ export default function StudentRegisterPage() {
                   id="grade"
                   value={grade}
                   onChange={(e) => setGrade(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors appearance-none"
+                  className="w-full px-4 py-3 sm:py-2.5 border border-border rounded-xl text-base sm:text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors appearance-none"
                 >
                   <option value="">Pilih</option>
                   <option value="x">X</option>
@@ -187,7 +187,7 @@ export default function StudentRegisterPage() {
                   placeholder="Minimal 8 karakter"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 border border-border rounded-xl text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  className="w-full pl-10 pr-10 py-3 sm:py-2.5 border border-border rounded-xl text-base sm:text-sm bg-input-bg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                 />
                 <button
                   type="button"
@@ -202,7 +202,7 @@ export default function StudentRegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 bg-primary text-white font-medium rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 sm:py-2.5 bg-primary text-white font-medium rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Mendaftar..." : "Daftar Sebagai Siswa"}
             </button>

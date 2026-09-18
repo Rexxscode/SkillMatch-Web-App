@@ -10,7 +10,7 @@ const brandFeatures = [
 
 export default function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-primary/5 px-4 py-10">
+    <div className="relative flex min-h-screen min-h-dvh items-center justify-center overflow-hidden bg-primary/5 px-3 py-8 sm:px-4 sm:py-10">
       <div
         className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/10 blur-3xl"
         aria-hidden
