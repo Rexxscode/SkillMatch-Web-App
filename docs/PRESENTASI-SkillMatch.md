@@ -73,13 +73,13 @@ Kenapa SkillMatch nyambung?
 
 Yang bikin SkillMatch beda dari aplikasi sejenis:
 
-- 🔐 **Verifikasi kartu pelajar sebagai gerbang utama.** Fitur inti (asesmen, career match, roadmap, sertifikat, lamar kerja) baru kebuka setelah kartu diverifikasi admin. Hasilnya: data terverifikasi, akun palsu ketahan dari awal.
-- 📊 **Career matching yang transparan.** Bukan kotak hitam — skor kecocokan dihitung dari hasil asesmen per skill, divisualkan pakai radar chart, plus daftar skill yang masih kurang (gap).
-- 🗺️ **Roadmap yang ngikutin skor, bukan template mentah.** Tiap milestone ada estimasi jam belajar dan sumber belajar kurasi (artikel, video, course, latihan).
-- 📜 **Sertifikat digital dari hasil nyata.** Lulus kuis materi (ambang 80%) → sertifikat otomatis kebentuk dan bisa diunduh PDF. Bukan sekadar klaim di CV.
-- 🌍 **Portofolio publik sekali klik.** Siswa punya halaman portofolio yang bisa dishare ke HRD tanpa perlu bikin dari nol, plus bisa diekspor jadi PDF.
-- 🏢 **Sisi industri yang adil.** Perusahaan nggak cuma pasang lowongan — mereka bisa cari kandidat berdasarkan tier kesiapan (Exploration → Developing → Almost Ready → Job Ready) lengkap dengan link portofolio.
-- 🌙 **Detail yang niat:** dark mode tanpa flicker (view transition), responsif sampai layar kecil, notifikasi lintas role (registrasi, verifikasi, lamaran saling nyambung).
+- 🔐 **Verifikasi kartu pelajar sebagai gerbang utama.** Fitur inti (asesmen, career match, roadmap, sertifikat, lamar kerja) baru kebuka setelah kartunya di-*approve* admin. Hasilnya: data terverifikasi, akun palsu ketahan dari awal.
+- 📊 **Career matching yang transparan.** Bukan *black box* — skor kecocokan dihitung dari hasil asesmen per skill, divisualkan pakai radar chart, plus *gap analysis* (list skill yang masih kurang).
+- 🗺️ **Roadmap yang ngikutin skor, bukan template mentah.** Tiap milestone ada estimasi jam belajar dan *curated resources* (artikel, video, course, latihan).
+- 📜 **Sertifikat digital dari hasil nyata.** Lulus kuis materi (threshold 80%) → sertifikat *auto-generated* dan bisa di-*download* PDF. Bukan sekadar *claim* di CV.
+- 🌍 **Portofolio publik sekali klik.** Siswa punya halaman portofolio yang bisa *di-share* ke HRD tanpa bikin dari nol, plus bisa diekspor jadi PDF.
+- 🏢 **Sisi industri yang adil.** Perusahaan nggak cuma pasang lowongan — mereka bisa cari kandidat berdasarkan *tier* kesiapan (Exploration → Developing → Almost Ready → Job Ready) lengkap dengan link portofolio.
+- 🌙 **Detail yang niat:** dark mode tanpa flicker (view transition), *fully responsive* sampai layar kecil, dan notifikasi lintas role (registrasi, verifikasi, lamaran saling nyambung).
 
 ---
 
@@ -114,16 +114,18 @@ Yang bikin SkillMatch beda dari aplikasi sejenis:
 
 ## Slide 7 — Teknologi & Arsitektur Sistem
 
-**Frontend** — Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS v4
-- Chart.js buat radar/bar/line, jsPDF buat sertifikat & CV, lucide-react buat ikon
-- State pakai React Context (Auth, Theme, Toast) — tanpa library berat tambahan
-- Dark mode, responsif mobile, proteksi route per role
+Kami pakai konsep **multirepo** — frontend dan backend punya repository terpisah, jadi tim bisa develop dan deploy secara mandiri tanpa saling nunggu.
 
-**Backend** — Laravel 13 (PHP 8.3), REST API di `/api/v1`
-- Autentikasi Sanctum (Bearer token), middleware role (student/admin/industry) + verifikasi kartu + rate limit
-- Arsitektur rapi: Controller → Service → Repository → Model (16 controller, 17 model)
-- Database versioned (30 migrasi) + data contoh siap demo (10 seeder)
-- Dokumentasi API ganda: Swagger UI Bahasa Indonesia + spesifikasi OpenAPI + koleksi Postman
+**Frontend** — di bagian frontend, kami menggunakan Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS v4:
+- Chart.js untuk visualisasi radar/bar/line chart, jsPDF untuk ekspor sertifikat & CV, lucide-react untuk ikon.
+- State management pakai React Context (Auth, Theme, Toast) — ringan, tanpa library berat tambahan.
+- Dark mode tanpa flicker, tampilan responsif, dan proteksi route per role lewat AuthGuard di tiap layout.
+
+**Backend** — untuk bagian backend, kami menggunakan Laravel 13 (PHP 8.3) sebagai REST API di `/api/v1`, disusun dengan **clean architecture**:
+- **Controller → Service → Repository → Model:** request masuk ke controller, logika bisnis tinggal di service, akses data dikurasi repository, dan model hanya urus relasi & accessor (16 controller, 14 service, 14 repository, 17 model).
+- Autentikasi pakai Laravel Sanctum (Bearer token) + custom middleware untuk role (student/admin/industry) dan verifikasi kartu.
+- Event & job (mis. event saat kartu diverifikasi memicu notifikasi lintas role) jadi *blueprint* arsitektur yang kami rancang — extensible, tinggal nempel tanpa bongkar struktur.
+- Dokumentasi API ganda: Swagger UI (Bahasa Indonesia) + spesifikasi OpenAPI + koleksi Postman.
 
 **Alurnya sederhana:**
 
@@ -132,8 +134,8 @@ Browser (Next.js) → REST API Laravel (/api/v1) → Database
         ↕ Bearer token + role + verifikasi kartu
 ```
 
-**DevOps:** GitHub Actions (CI/CD) + Tencent Cloud (server) + deploy script yang reproducible.
-**Kualitas:** testing backend (PHPUnit), E2E frontend lintas role (28 skenario), ESLint + TypeScript.
+**Deployment:** server dengan auto-deploy via webhook setiap ada push, di-manage pakai PM2 (deploy.sh + ecosystem.config) — reproducible dan gampang rollback.
+**Kualitas:** testing backend (PHPUnit), E2E testing frontend lintas role, ESLint + TypeScript.
 
 ---
 
@@ -141,16 +143,17 @@ Browser (Next.js) → REST API Laravel (/api/v1) → Database
 
 **Dampak yang kami kejar:**
 
-- 🎓 **Buat siswa:** akhirnya punya cermin yang jujur — "kemampuanku di mana, kurangku apa, belajarnya ke mana, buktinya apa."
-- 🏫 **Buat sekolah:** punya dashboard kesiapan kerja yang datanya nyata, bukan kira-kira. Bisa jadi bahan evaluasi kurikulum.
+- 🎓 **Buat siswa:** akhirnya punya cermin yang jujur — "kemampuanku di mana, kurangnya apa, belajarnya ke mana, buktinya apa."
+- 🏫 **Buat sekolah:** punya dashboard kesiapan kerja dengan real data, bukan perkiraan — bisa jadi bahan evaluasi kurikulum.
 - 🏢 **Buat industri:** rekrutmen lebih cepat dan objektif — kandidat datang lengkap dengan skor, skill, portofolio, dan status terverifikasi.
 
-**Kenapa ini bisa jalan terus (keberlanjutan):**
+**Kenapa ini bisa sustain (keberlanjutan):**
 
-- Lisensi MIT + dokumentasi API terbuka → sekolah atau industri baru gampang ikut gabung.
-- Data contoh + akun demo siap pakai → adopsi awal nggak ribet.
-- Portofolio publik tanpa login → menjangkau HRD yang bahkan belum punya akun.
-- Arsitektur backend yang modular + CI/CD + testing → fitur baru bisa ditambah tanpa bongkar total.
-- Notifikasi lintas role + tampilan mobile-friendly → penggunanya betah balik lagi.
+- Lisensi MIT + *open API documentation* → sekolah atau industri baru gampang on-board.
+- Arsitektur backend yang modular + testing + auto-deploy via webhook → fitur baru bisa ditambah tanpa bongkar total.
+- Akun demo siap pakai → adopsi awal enggak ribet.
+- Portofolio publik tanpa login → jangkauan luas, HRD yang belum punya akun pun bisa lihat kandidat.
+- Notifikasi lintas role + *fully responsive* → pengguna betah balik lagi.
+- Sertifikat dan kartu terverifikasi → *trust loop* yang bikin data makin berharga seiring waktu.
 
 **Penutup:** SkillMatch bukan aplikasi yang selesai di lomba — ini fondasi jembatan jangka panjang antara SMK dan dunia kerja. Terima kasih! 🙏
