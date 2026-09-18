@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./lib/theme-context";
@@ -54,10 +54,11 @@ export const metadata: Metadata = {
     description:
       "Platform career readiness untuk siswa vokasi dan kebutuhan industri.",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
