@@ -4951,6 +4951,7 @@ export async function fetchMajorQuizAdmin(major?: string): Promise<QuizQuestion[
 
 export async function saveMajorQuizAdmin(major: string, questions: QuizQuestion[]): Promise<boolean> {
   await api.put(BACKEND_ENDPOINTS.assessment.update(major), {
+    major,
     questions: questions.map((q) => ({
       question: q.question.trim(),
       options: q.options.map((o) => o.trim()),
@@ -4963,6 +4964,6 @@ export async function saveMajorQuizAdmin(major: string, questions: QuizQuestion[
 }
 
 export async function resetMajorQuizAdmin(major: string): Promise<boolean> {
-  await api.post(BACKEND_ENDPOINTS.assessment.reset(major));
+  await api.post(BACKEND_ENDPOINTS.assessment.reset(major), { major });
   return true;
 }

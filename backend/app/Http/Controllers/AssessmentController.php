@@ -71,7 +71,10 @@ class AssessmentController extends Controller
 
     public function updateQuestions(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make($request->all([
+            'major',
+            'questions',
+        ]), [
             'major' => 'required|string|in:RPL,DKV,TJKT',
             'questions' => 'required|array',
         ]);
@@ -95,7 +98,9 @@ class AssessmentController extends Controller
 
     public function resetQuestions(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make($request->all([
+            'major',
+        ]), [
             'major' => 'required|string|in:RPL,DKV,TJKT',
         ]);
 

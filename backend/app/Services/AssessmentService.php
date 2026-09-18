@@ -6,6 +6,7 @@ use App\Repositories\AssessmentRepository;
 use App\Repositories\StudentRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class AssessmentService
 {
@@ -70,17 +71,26 @@ class AssessmentService
         $levelMap = ['beginner' => 1, 'developing' => 2, 'intermediate' => 3, 'advanced' => 4, 'expert' => 5];
         $student = $this->students->findById($userId);
 
-        if ($student) {
-            $this->assessments->saveResult([
-                'student_id' => $student->id,
-                'major_id' => $major,
-                'score' => $correct,
-                'percentage' => $percentage,
-                'level' => $levelMap[$level] ?? 1,
-                'skill_scores' => json_encode($skillScores),
-                'answered_at' => now(),
+        if (!$student) {
+            Log::error(sprintf(
+                '[Assessment] Siswa tidak ditemukan untuk user id %d saat submit asesmen. Skor tidak tersimpan.',
+                $userId,
+            ));
+
+            throw ValidationException::withMessages([
+                'student' => 'Profil siswa tidak ditemukan. Lengkapi profil sebelum mengerjakan asesmen.',
             ]);
         }
+
+        $this->assessments->saveResult([
+            'student_id' => $student->id,
+            'major_id' => $major,
+            'score' => $correct,
+            'percentage' => $percentage,
+            'level' => $levelMap[$level] ?? 1,
+            'skill_scores' => json_encode($skillScores),
+            'answered_at' => now(),
+        ]);
 
         return [
             'score' => $correct,

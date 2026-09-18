@@ -24,6 +24,7 @@ import {
 } from "../../../lib/major-quiz";
 import type { QuizQuestion } from "../../../lib/major-quiz";
 import { useToast } from "../../../lib/toast-context";
+import { ApiError } from "../../../lib/api";
 
 const DIFFICULTIES: QuizQuestion["difficulty"][] = ["basic", "intermediate", "advanced", "expert"];
 
@@ -68,9 +69,15 @@ export default function AdminMajorQuizPage() {
         setDraft([]);
         setLoadedCount(0);
       }
-    } catch {
+    } catch (err) {
       setDraft([]);
       setLoadedCount(0);
+      toast(
+        err instanceof ApiError
+          ? `Gagal memuat soal (${err.status}): ${err.message}`
+          : "Gagal memuat soal dari server",
+        "warning",
+      );
     } finally {
       setLoading(false);
     }
@@ -152,7 +159,10 @@ export default function AdminMajorQuizPage() {
       await saveMajorQuizAdmin(editingMajor, draft);
       toast(`Soal tes jurusan diperbarui (${draft.length} soal)`);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Gagal menyimpan soal", "warning");
+      const detail = err instanceof ApiError && err.errors
+        ? Object.values(err.errors).flat().join(" · ")
+        : err instanceof ApiError ? err.message : "Gagal menyimpan soal";
+      toast(detail, "warning");
     } finally {
       setSaving(false);
     }
@@ -167,8 +177,11 @@ export default function AdminMajorQuizPage() {
       const fresh = await fetchMajorQuizAdmin(editingMajor);
       setDraft(fresh.length > 0 ? fresh : []);
       toast("Soal dikembalikan ke versi default");
-    } catch {
-      toast("Gagal mereset soal", "warning");
+    } catch (err) {
+      const detail = err instanceof ApiError
+        ? `Gagal mereset (${err.status}): ${err.message}`
+        : "Gagal mereset soal";
+      toast(detail, "warning");
     } finally {
       setSaving(false);
     }

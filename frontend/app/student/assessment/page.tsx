@@ -11,8 +11,9 @@ import { SkeletonDashboard } from "../../components/ui/skeleton";
 import DashboardHeader from "../../components/layout/dashboardheader";
 import { useAuth } from "../../lib/auth-context";
 import { useCardStatus } from "../../components/student-card-gate";
-import { api, BACKEND_ENDPOINTS } from "../../lib/api";
+import { api, BACKEND_ENDPOINTS, ApiError } from "../../lib/api";
 import { addNotification } from "../../lib/notifications";
+import { useToast } from "../../lib/toast-context";
 import { gradeQuiz, type QuizQuestion, type QuizResult } from "../../lib/major-quiz";
 import { generateCareerMatches, saveCareerMatches } from "../../lib/career-match";
 import { saveQuizResult, saveQuizAnswers } from "../../lib/major-roadmap";
@@ -61,6 +62,7 @@ function getLevelColor(level: number): "danger" | "warning" | "default" | "prima
 export default function AssessmentPage() {
   const { user } = useAuth();
   const { approved } = useCardStatus();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const isRetake = searchParams.get("retake") === "true";
   const [mounted, setMounted] = useState(false);
@@ -71,6 +73,7 @@ export default function AssessmentPage() {
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [resultSkills, setResultSkills] = useState<Skill[]>([]);
 
   useEffect(() => { setMounted(true); }, []);
@@ -129,8 +132,21 @@ export default function AssessmentPage() {
           major: currentUser.major,
           answers: quizAnswers,
         });
-      } catch {
-        // Result is still shown based on local grading; submission retried on next attempt.
+        setSubmitError(null);
+      } catch (err) {
+        setSubmitError(
+          err instanceof ApiError
+            ? `Hasil belum tersimpan ke server (${err.status}): ${err.message}`
+            : "Hasil belum tersimpan ke server. Periksa koneksi, lalu ulangi asesmen.",
+        );
+        toast(
+          err instanceof ApiError && err.errors
+            ? Object.values(err.errors).flat().join(" · ")
+            : err instanceof ApiError
+            ? err.message
+            : "Gagal mengirim jawaban ke server",
+          "warning",
+        );
       }
 
       const careerMatches = generateCareerMatches(majorName, result);
